@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="bs">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="BlinkProbe measures your blink rate with the webcam and tests which subtle on-screen cue reliably triggers a blink. Everything runs locally in your browser.">
     <title>BlinkProbe</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
@@ -40,7 +41,7 @@
         .muted { color: var(--muted); }
         .small { font-size: .875rem; }
 
-        /* zaglavlje */
+        /* header */
         .bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
             padding: 10px clamp(16px, 4vw, 40px); background: var(--bg); border-bottom: 1px solid var(--line); }
         .bar h1 { font-size: 1rem; font-weight: 600; margin: 0; }
@@ -107,7 +108,7 @@
         #warn { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 92px); z-index: 24; background: var(--warn); color: #fff; padding: 8px clamp(16px, 4vw, 40px); font-size: .875rem; }
         #warn[hidden] { display: none; }
 
-        /* tekst za čitanje */
+        /* reading text */
         .read { display: none; max-width: 62ch; margin: 28px auto 0; font-family: var(--read); font-size: clamp(1.125rem, 1.6vw, 1.3125rem); line-height: 1.65; }
         body[data-phase="calib"] .read, body[data-phase="test"] .read { display: block; }
         .read h2 { font-family: var(--read); font-weight: 500; font-size: 1.75rem; margin: 0 0 18px; }
@@ -116,7 +117,7 @@
         body[data-phase="calib"] details.own, body[data-phase="test"] details.own { display: block; }
         details.own summary { cursor: pointer; color: var(--muted); }
 
-        /* signali - forma */
+        /* cues - form */
         .sig { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
         .sig:first-of-type { border-top: 0; }
         .sig input { margin-top: 5px; }
@@ -129,14 +130,14 @@
         .opt input { margin-top: 5px; }
         .opt span small { display: block; color: var(--muted); font-size: .8125rem; }
 
-        /* rezultati */
+        /* results */
         .table-wrap { overflow-x: auto; max-width: 100%; }
         table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .9375rem; }
         th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
         th { font-weight: 500; color: var(--muted); font-size: .8125rem; }
         td.n { font-variant-numeric: tabular-nums; }
         .chip { display: inline-block; padding: 1px 10px; border-radius: 999px; border: 1px solid currentColor; font-size: .8125rem; white-space: nowrap; }
-        .chip.djeluje { color: var(--ok); } .chip.naznaka { color: var(--warn); } .chip.nema { color: var(--muted); } .chip.malo { color: var(--muted); border-style: dashed; }
+        .chip.works { color: var(--ok); } .chip.hint { color: var(--warn); } .chip.none { color: var(--muted); } .chip.few { color: var(--muted); border-style: dashed; }
         #plot { width: 100%; height: auto; display: block; margin: 8px 0; }
         #plot text { fill: var(--muted); font-family: var(--ui); font-size: 12px; }
         .filters { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: end; margin: 12px 0 4px; }
@@ -155,82 +156,82 @@
 <body>
 <header class="bar">
     <h1>BlinkProbe</h1>
-    <nav class="steps" aria-label="Koraci">
-        <button type="button" data-go="setup"><span>1</span>Kamera</button>
-        <button type="button" data-go="calib"><span>2</span>Kalibracija</button>
+    <nav class="steps" aria-label="Steps">
+        <button type="button" data-go="setup"><span>1</span>Camera</button>
+        <button type="button" data-go="calib"><span>2</span>Calibration</button>
         <button type="button" data-go="test"><span>3</span>Test</button>
-        <button type="button" data-go="results"><span>4</span>Rezultati</button>
+        <button type="button" data-go="results"><span>4</span>Results</button>
     </nav>
-    <span id="track" class="track" data-state="off"><i></i><b id="trackTxt" style="font-weight:400">kamera isključena</b></span>
+    <span id="track" class="track" data-state="off"><i></i><b id="trackTxt" style="font-weight:400">camera off</b></span>
 </header>
 
 <div id="hud" hidden>
     <span id="hudTxt">–</span>
     <div class="prog"><i id="hudBar"></i></div>
-    <button id="hudStop" type="button">Zaustavi</button>
+    <button id="hudStop" type="button">Stop</button>
 </div>
 <div id="warn" role="alert" hidden></div>
 
 <main class="wrap">
 
-    <!-- 1. KAMERA -->
+    <!-- 1. CAMERA -->
     <section id="p-setup" class="page">
-        <h2>Kamera i provjera</h2>
-        <p class="lead">Kamera služi samo za brojanje treptaja. Slika se obrađuje u ovom prozoru i nikad se ne snima niti šalje. S interneta se preuzimaju samo programska biblioteka i model za prepoznavanje lica, i to pri učitavanju kamere.</p>
+        <h2>Camera and setup check</h2>
+        <p class="lead">The camera is used only to count blinks. The image is processed in this window and is never recorded or sent. Only the software library and the face-tracking model are downloaded from the internet, and only when you enable the camera.</p>
         <div class="row">
-            <button id="camBtn" type="button" class="primary">Uključi kameru</button>
-            <select id="camSel" hidden aria-label="Odabir kamere"></select>
+            <button id="camBtn" type="button" class="primary">Enable camera</button>
+            <select id="camSel" hidden aria-label="Select camera"></select>
         </div>
         <p id="camMsg" class="msg" role="status"></p>
 
         <div id="monitor" class="monitor">
             <div class="mon-video"><video id="video" playsinline muted></video></div>
             <div>
-                <canvas id="graph" width="720" height="220" aria-label="Graf zatvorenosti očiju u posljednjih 8 sekundi"></canvas>
+                <canvas id="graph" width="720" height="220" aria-label="Graph of eye closure over the last 8 seconds"></canvas>
                 <ul class="chips">
-                    <li id="ch-face"><span>Lice</span><b>–</b></li>
-                    <li id="ch-fps"><span>Kadrova u sekundi</span><b>–</b></li>
-                    <li id="ch-light"><span>Svjetlo</span><b>–</b></li>
-                    <li id="ch-dist"><span>Udaljenost</span><b>–</b></li>
-                    <li id="ch-count"><span>Treptaja (uživo)</span><b>0</b></li>
+                    <li id="ch-face"><span>Face</span><b>–</b></li>
+                    <li id="ch-fps"><span>Frames per second</span><b>–</b></li>
+                    <li id="ch-light"><span>Light</span><b>–</b></li>
+                    <li id="ch-dist"><span>Distance</span><b>–</b></li>
+                    <li id="ch-count"><span>Blinks (live)</span><b>0</b></li>
                 </ul>
             </div>
         </div>
 
         <div id="setupHelp" hidden>
-            <h3>Prije nastavka</h3>
+            <h3>Before you continue</h3>
             <ol class="check">
-                <li>Trepni nekoliko puta. Na grafu se moraju pojaviti skokovi, a brojač treptaja mora rasti.</li>
-                <li>Svjetlo treba biti ispred tebe, ne iza. Refleksije na naočalima smanjuju tačnost.</li>
-                <li>Sjedi na uobičajenoj udaljenosti od monitora, s kamerom što bliže gornjoj ivici ekrana.</li>
-                <li>Kad gledaš u tekst na ekranu, oči su spuštene. Provjeri da i tada lice ostaje praćeno.</li>
+                <li>Blink a few times. Spikes should appear on the graph, and the blink counter should go up.</li>
+                <li>The light should be in front of you, not behind you. Reflections on glasses reduce accuracy.</li>
+                <li>Sit at your usual distance from the monitor, with the camera as close as possible to the top edge of the screen.</li>
+                <li>When you look at text on the screen, your eyes are lowered. Check that your face is still tracked even then.</li>
             </ol>
-            <div class="row"><button id="toCalib" type="button" class="primary">Dalje: kalibracija</button></div>
+            <div class="row"><button id="toCalib" type="button" class="primary">Next: calibration</button></div>
         </div>
     </section>
 
-    <!-- 2. KALIBRACIJA -->
+    <!-- 2. CALIBRATION -->
     <section id="p-calib" class="page">
         <div id="calibForm">
-            <h2>Kalibracija</h2>
-            <p class="lead">Čitaj tekst ispod kao inače, bez ikakvih signala. Aplikacija mjeri koliko trepćeš i koliko su ti oči obično otvorene. To je osnova za poređenje.</p>
+            <h2>Calibration</h2>
+            <p class="lead">Read the text below as you normally would, without any cues. The app measures how often you blink and how open your eyes usually are. This is the baseline for comparison.</p>
             <div class="row">
-                <label>Trajanje
+                <label>Duration
                     <select id="calDur">
-                        <option value="0.5">30 s (samo za probu)</option>
+                        <option value="0.5">30 s (quick check only)</option>
                         <option value="1">1 min</option>
                         <option value="2" selected>2 min</option>
                         <option value="3">3 min</option>
                     </select>
                 </label>
-                <button id="calStart" type="button" class="primary">Počni kalibraciju</button>
-                <button id="calSkip" type="button">Preskoči</button>
+                <button id="calStart" type="button" class="primary">Start calibration</button>
+                <button id="calSkip" type="button">Skip</button>
             </div>
             <div id="calResult" class="card" hidden>
-                <h3>Rezultat kalibracije</h3>
+                <h3>Calibration result</h3>
                 <div id="calStats" class="stat-list"></div>
                 <p id="calNote" class="small muted"></p>
-                <div class="row"><button id="calNext" type="button" class="primary">Dalje: test</button><button id="calAgain" type="button">Ponovi kalibraciju</button></div>
+                <div class="row"><button id="calNext" type="button" class="primary">Next: test</button><button id="calAgain" type="button">Repeat calibration</button></div>
             </div>
         </div>
     </section>
@@ -238,148 +239,148 @@
     <!-- 3. TEST -->
     <section id="p-test" class="page">
         <div id="testForm">
-            <h2>Test signala</h2>
-            <p class="lead">Čitaj tekst ispod. Signali se pojavljuju sami. Među njima su i <b>kontrolni pokušaji bez ikakvog signala</b>, koji služe da se vidi koliko bi treptaja bilo i inače. Nemoj ništa pritiskati.</p>
+            <h2>Cue test</h2>
+            <p class="lead">Read the text below. Cues appear by themselves, mixed with <b>control trials that have no cue at all</b>, which show how often you would blink anyway. Don't press anything.</p>
             <div class="two">
                 <div>
-                    <h3>Signali</h3>
-                    <div class="sig"><input type="checkbox" id="c-loom" checked aria-labelledby="l-loom"><div class="t"><b id="l-loom">Nalijetanje</b><span>Mali oblik pored teksta brzo naraste, kao da se približava.</span></div><button class="tiny" type="button" data-preview="loom">Prikaži</button></div>
-                    <div class="sig"><input type="checkbox" id="c-dim" checked aria-labelledby="l-dim"><div class="t"><b id="l-dim">Zatamnjenje</b><span>Cijeli ekran se na trenutak blago zatamni.</span></div><button class="tiny" type="button" data-preview="dim">Prikaži</button></div>
-                    <div class="sig"><input type="checkbox" id="c-blur" checked aria-labelledby="l-blur"><div class="t"><b id="l-blur">Zamućenje</b><span>Tekst se na trenutak malo zamuti.</span></div><button class="tiny" type="button" data-preview="blur">Prikaži</button></div>
-                    <div class="sig"><input type="checkbox" id="c-eye" checked aria-labelledby="l-eye"><div class="t"><b id="l-eye">Oko koje trepće</b><span>Sićušno oko pored teksta dva puta trepne.</span></div><button class="tiny" type="button" data-preview="eye">Prikaži</button></div>
-                    <p class="small muted" style="margin-top:10px">Svaki signal je jedan kratak impuls, nikad treperenje.</p>
+                    <h3>Cues</h3>
+                    <div class="sig"><input type="checkbox" id="c-loom" checked aria-labelledby="l-loom"><div class="t"><b id="l-loom">Looming shape</b><span>A small shape beside the text quickly grows, as if it were coming closer.</span></div><button class="tiny" type="button" data-preview="loom">Preview</button></div>
+                    <div class="sig"><input type="checkbox" id="c-dim" checked aria-labelledby="l-dim"><div class="t"><b id="l-dim">Dimming</b><span>The whole screen dims slightly for a moment.</span></div><button class="tiny" type="button" data-preview="dim">Preview</button></div>
+                    <div class="sig"><input type="checkbox" id="c-blur" checked aria-labelledby="l-blur"><div class="t"><b id="l-blur">Blur</b><span>The text blurs slightly for a moment.</span></div><button class="tiny" type="button" data-preview="blur">Preview</button></div>
+                    <div class="sig"><input type="checkbox" id="c-eye" checked aria-labelledby="l-eye"><div class="t"><b id="l-eye">Blinking eye</b><span>A tiny eye beside the text blinks twice.</span></div><button class="tiny" type="button" data-preview="eye">Preview</button></div>
+                    <p class="small muted" style="margin-top:10px">Each cue is a single brief pulse, never a flicker.</p>
                 </div>
                 <div>
                     <div class="field">
-                        <div class="lbl"><span>Jačina signala</span><output id="o-int">40%</output></div>
-                        <input type="range" id="intensity" min="0" max="100" value="40" aria-label="Jačina signala">
+                        <div class="lbl"><span>Cue intensity</span><output id="o-int">40%</output></div>
+                        <input type="range" id="intensity" min="0" max="100" value="40" aria-label="Cue intensity">
                     </div>
                     <div class="field">
-                        <div class="lbl"><span>Najkraći razmak između signala</span><output id="o-min">8 s</output></div>
-                        <input type="range" id="tmin" min="3" max="60" value="8" aria-label="Najkraći razmak u sekundama">
-                        <div class="lbl"><span>Najduži razmak</span><output id="o-max">16 s</output></div>
-                        <input type="range" id="tmax" min="3" max="90" value="16" aria-label="Najduži razmak u sekundama">
+                        <div class="lbl"><span>Shortest interval between cues</span><output id="o-min">8 s</output></div>
+                        <input type="range" id="tmin" min="3" max="60" value="8" aria-label="Shortest interval in seconds">
+                        <div class="lbl"><span>Longest interval</span><output id="o-max">16 s</output></div>
+                        <input type="range" id="tmax" min="3" max="90" value="16" aria-label="Longest interval in seconds">
                     </div>
                     <div class="field">
-                        <div class="lbl"><span>Način</span></div>
-                        <label class="opt"><input type="radio" name="mode" value="random" checked><span>Nasumično<small>Signali dolaze neovisno o tvom treptanju. Najčišće mjerenje.</small></span></label>
-                        <label class="opt"><input type="radio" name="mode" value="adaptive"><span>Adaptivno<small>Signal (i kontrola) dolazi tek kad nisi trepnuo određeno vrijeme. Ovako bi radila gotova aplikacija.</small></span></label>
+                        <div class="lbl"><span>Mode</span></div>
+                        <label class="opt"><input type="radio" name="mode" value="random" checked><span>Random<small>Cues arrive independently of your blinking. The cleanest measurement.</small></span></label>
+                        <label class="opt"><input type="radio" name="mode" value="adaptive"><span>Adaptive<small>A cue (or a control) arrives only after you have not blinked for a set time. This is how a finished app would behave.</small></span></label>
                     </div>
                     <div class="field" id="adaptField" hidden>
-                        <div class="lbl"><span>Bez treptaja najmanje</span><output id="o-ad">8 s</output></div>
-                        <input type="range" id="adapt" min="4" max="20" value="8" aria-label="Sekundi bez treptaja prije signala">
+                        <div class="lbl"><span>No blink for at least</span><output id="o-ad">8 s</output></div>
+                        <input type="range" id="adapt" min="4" max="20" value="8" aria-label="Seconds without a blink before a cue">
                     </div>
                     <div class="field">
-                        <label class="lbl" for="tdur"><span>Trajanje testa</span></label>
+                        <label class="lbl" for="tdur"><span>Test duration</span></label>
                         <select id="tdur">
-                            <option value="2">2 min (samo za probu rada)</option>
+                            <option value="2">2 min (quick check only)</option>
                             <option value="10">10 min</option>
                             <option value="20" selected>20 min</option>
                             <option value="30">30 min</option>
                             <option value="45">45 min</option>
-                            <option value="0">Dok ne zaustavim</option>
+                            <option value="0">Until I stop</option>
                         </select>
                         <span id="estN" class="small muted"></span>
                     </div>
                 </div>
             </div>
             <div class="row">
-                <button id="testStart" type="button" class="primary">Počni test</button>
+                <button id="testStart" type="button" class="primary">Start test</button>
                 <span id="testMsg" class="msg err" role="alert"></span>
             </div>
         </div>
     </section>
 
-    <!-- tekst za čitanje (kalibracija i test) -->
+    <!-- reading text (calibration and test) -->
     <article id="reading" class="read">
-        <h2>Zašto premalo trepćemo pred ekranom</h2>
-        <p>Kad zurimo u ekran, trepćemo otprilike upola rjeđe nego inače. Uobičajeno je oko petnaest do dvadeset treptaja u minuti, a tokom koncentrisanog rada taj broj može pasti na osam ili deset. Osim toga, mnogi treptaji su nepotpuni: kapak se spusti tek napola i suzni film se ne obnovi do kraja.</p>
-        <p>Suzni film je tanak sloj tečnosti koji drži rožnjaču vlažnom i glatkom. Kad ga dugo ne obnavljamo, počinje da isparava, površina oka postaje neravna, a slika se blago zamuti. Tada oko peče, svrbi ili djeluje kao da u njemu ima pijeska. Tegobe najčešće dolaze predvečer, poslije više sati pred monitorom.</p>
-        <p>Sam treptaj traje otprilike desetinku do dvije desetinke sekunde. Za to vrijeme kapak razmaže suzni film preko rožnjače, a žlijezde na rubu kapka ispuste tanak sloj ulja koji usporava isparavanje. Kad su treptaji rijetki ili nepotpuni, taj sloj se slabije obnavlja, a donji dio rožnjače ostaje izloženiji zraku.</p>
-        <p>Treptanje nije samo mehaničko čišćenje. Mozak ga koristi i kao male pauze: trepćemo na kraju rečenice, kad okrenemo stranicu ili kad završimo neku misao. Zato duboka koncentracija i rijetko treptanje idu zajedno.</p>
-        <p>Ljudi trepću i refleksno. Dodir rožnjače, iznenadna svjetlost ili nešto što naglo leti prema licu izazivaju treptaj bez naše odluke. Čini se da tokom duboke usredotočenosti spontano treptanje slabi, dok refleksi ostaju, i upravo na to se ovdje računa.</p>
-        <p>Poznato pravilo dvadeset-dvadeset-dvadeset savjetuje da svakih dvadesetak minuta na dvadesetak sekundi pogledaš nešto što je udaljeno oko šest metara. Ono opušta mišiće za fokusiranje, a usput najčešće natjera i na nekoliko punih treptaja.</p>
-        <p>Na isparavanje utiču i vlažnost zraka, strujanje iz klima-uređaja ili ventilatora i položaj monitora. Kad gledamo prema gore, oko je šire otvoreno i izloženo je više njegove površine, pa monitor postavljen malo ispod nivoa očiju obično znači manje isparavanja.</p>
-        <p>Ako ti se oči redovno suše, peku ili muće pred kraj dana, vrijedi razgovarati s očnim ljekarom. Umjetne suze i dobre navike pomažu, ali uzrok nije uvijek samo ekran.</p>
-        <p>Dok čitaš, ne traži signale pogledom i ne pokušavaj kontrolisati treptanje. Cilj je da se oči ponašaju onako kako se inače ponašaju tokom rada.</p>
+        <h2>Why we blink less in front of a screen</h2>
+        <p>When we stare at a screen, we blink about half as often as usual. Normally it is around fifteen to twenty blinks a minute, but during focused work that number can fall to eight or ten. On top of that, many blinks are incomplete: the lid drops only halfway, and the tear film is not fully renewed.</p>
+        <p>The tear film is a thin layer of fluid that keeps the cornea moist and smooth. When it is not renewed for a long time, it starts to evaporate, the surface of the eye becomes uneven, and vision blurs slightly. The eye then burns, itches, or feels as if there were sand in it. Discomfort most often sets in toward evening, after several hours in front of a monitor.</p>
+        <p>A blink itself lasts roughly one to two tenths of a second. During that time the lid spreads the tear film across the cornea, and glands along the edge of the lid release a thin layer of oil that slows evaporation. When blinks are rare or incomplete, that layer is renewed less well, and the lower part of the cornea stays more exposed to the air.</p>
+        <p>Blinking is not just mechanical cleaning. The brain also uses it to mark small pauses: we blink at the end of a sentence, when we turn a page, or when we finish a thought. That is why deep concentration and infrequent blinking go hand in hand.</p>
+        <p>People also blink reflexively. A touch to the cornea, a sudden bright light, or something flying quickly toward the face triggers a blink without any decision on our part. It seems that during deep focus spontaneous blinking weakens while the reflexes remain, and that is exactly what this test relies on.</p>
+        <p>The well-known 20-20-20 rule advises that, every twenty minutes or so, you look for about twenty seconds at something about twenty feet (six meters) away. This relaxes the focusing muscles and, along the way, usually prompts a few full blinks as well.</p>
+        <p>Evaporation is also affected by the humidity of the air, the airflow from an air conditioner or fan, and the position of the monitor. When we look upward, the eye opens wider and more of its surface is exposed, so a monitor placed slightly below eye level usually means less evaporation.</p>
+        <p>If your eyes regularly feel dry or burn, or your vision blurs toward the end of the day, it is worth talking to an eye doctor. Artificial tears and good habits help, but the cause is not always just the screen.</p>
+        <p>While you read, do not hunt for cues with your eyes and do not try to control your blinking. The aim is for your eyes to behave the way they normally do while you work.</p>
     </article>
     <details class="own">
-        <summary>Radije čitaš vlastiti tekst?</summary>
-        <p class="small muted" style="margin-top:8px">Zalijepi bilo koji tekst (članak, e-poštu, dokument) i čitaj njega umjesto ponuđenog.</p>
-        <textarea id="ownText" aria-label="Vlastiti tekst"></textarea>
-        <div class="row"><button id="ownUse" type="button" class="tiny">Koristi ovaj tekst</button><button id="ownReset" type="button" class="tiny">Vrati ponuđeni tekst</button></div>
+        <summary>Prefer to read your own text?</summary>
+        <p class="small muted" style="margin-top:8px">Paste any text (an article, an email, a document) and read it instead of the default text.</p>
+        <textarea id="ownText" aria-label="Your own text"></textarea>
+        <div class="row"><button id="ownUse" type="button" class="tiny">Use this text</button><button id="ownReset" type="button" class="tiny">Restore default text</button></div>
     </details>
 
-    <!-- 4. REZULTATI -->
+    <!-- 4. RESULTS -->
     <section id="p-results" class="page">
-        <h2>Rezultati</h2>
-        <p class="lead">Za svaki signal se broji koliko puta si trepnuo u prozoru odgovora poslije signala, i to se poredi s kontrolnim pokušajima bez signala. Signal pomaže samo ako je udio treptaja jasno veći nego u kontroli.</p>
+        <h2>Results</h2>
+        <p class="lead">For each cue, the app counts how often you blinked in the response window after the cue and compares this with control trials that had no cue. A cue helps only if the rate of blinks is clearly higher than in the control.</p>
 
         <div class="filters">
-            <label>Podaci
-                <select id="fScope"><option value="all">Sve sesije</option><option value="last">Samo posljednja sesija</option></select>
+            <label>Data
+                <select id="fScope"><option value="all">All sessions</option><option value="last">Last session only</option></select>
             </label>
-            <label>Način
-                <select id="fMode"><option value="random">Nasumično</option><option value="adaptive">Adaptivno</option></select>
+            <label>Mode
+                <select id="fMode"><option value="random">Random</option><option value="adaptive">Adaptive</option></select>
             </label>
-            <label>Prozor odgovora od (ms)
+            <label>Response window from (ms)
                 <input type="number" id="fW0" value="100" min="0" max="800" step="50">
             </label>
-            <label>do (ms)
+            <label>to (ms)
                 <input type="number" id="fW1" value="1000" min="300" max="1500" step="50">
             </label>
         </div>
 
-        <div id="resEmpty" class="card" hidden>Još nema podataka za ovaj izbor. Odradi test u koraku 3.</div>
+        <div id="resEmpty" class="card" hidden>No data for this selection yet. Run a test in step 3.</div>
         <div id="resBody">
             <div id="concl" class="concl"></div>
-            <svg id="plot" role="img" aria-label="Udio treptaja poslije svakog signala i u kontroli, s 95% rasponom"></svg>
+            <svg id="plot" role="img" aria-label="Rate of blinks after each cue and in the control, with 95% CI"></svg>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Signal</th><th>Valjanih pokušaja</th><th>Treptaj u prozoru</th><th>95% raspon</th><th>Razlika od kontrole</th><th>p</th><th>Ocjena</th><th>Kašnjenje</th></tr></thead>
+                    <thead><tr><th>Cue</th><th>Valid trials</th><th>Blink in window</th><th>95% CI</th><th>Difference vs control</th><th>p</th><th>Verdict</th><th>Latency</th></tr></thead>
                     <tbody id="resRows"></tbody>
                 </table>
             </div>
             <p id="resNote" class="small muted"></p>
 
-            <h3 style="margin-top:28px">Tvoj utisak</h3>
-            <p class="small muted">Ocijeni poslije testa. 1 znači jedva primjetno ili nimalo smetnje, 5 znači vrlo primjetno ili vrlo smeta.</p>
+            <h3 style="margin-top:28px">Your impression</h3>
+            <p class="small muted">Rate the cues after the test. 1 means barely noticeable or not annoying at all, 5 means very noticeable or very annoying.</p>
             <div class="table-wrap"><table style="min-width:420px">
-                <thead><tr><th>Signal</th><th>Primjetnost</th><th>Smetnja</th></tr></thead>
+                <thead><tr><th>Cue</th><th>Noticeability</th><th>Annoyance</th></tr></thead>
                 <tbody id="rateRows"></tbody>
             </table></div>
 
-            <h3 style="margin-top:28px">Tvoje treptanje</h3>
+            <h3 style="margin-top:28px">Your blinking</h3>
             <div id="blinkStats" class="stat-list"></div>
             <p id="blinkNote" class="small muted"></p>
         </div>
 
         <div class="row" style="margin-top:28px">
-            <button id="rNew" type="button" class="primary">Novi test</button>
-            <button id="rJson" type="button">Preuzmi podatke (JSON)</button>
-            <button id="rCsv" type="button">Preuzmi pokušaje (CSV)</button>
-            <button id="rClear" type="button" class="danger">Obriši sve podatke</button>
+            <button id="rNew" type="button" class="primary">New test</button>
+            <button id="rJson" type="button">Download data (JSON)</button>
+            <button id="rCsv" type="button">Download trials (CSV)</button>
+            <button id="rClear" type="button" class="danger">Delete all data</button>
         </div>
-        <p id="storeWarn" class="small err msg" hidden>Preglednik ne dozvoljava spremanje podataka. Rezultati će ostati samo dok je ova stranica otvorena. Preuzmi ih prije zatvaranja.</p>
+        <p id="storeWarn" class="small err msg" hidden>Your browser does not allow saving data. Results will stay only while this page is open. Download them before closing the page.</p>
     </section>
 </main>
 <div id="stage" aria-hidden="true"></div>
 
 <script type="module">
-    /* ===================== JEZGRO (bez DOM-a, testirano u Node-u) ===================== */
+    /* ===================== CORE (DOM-free, unit-testable in Node) ===================== */
     const DEFAULTS = {
-        onDelta: 0.22,      // koliko iznad osnovnog nivoa oko mora "pasti" da se broji kao početak treptaja
-        offDelta: 0.10,     // treptaj je gotov kad se vrati ispod osnove + ovo
-        tauUp: 8000,        // spora prilagodba osnove naviše (ms), npr. pogled prema dolje
-        tauDown: 1500,      // brža prilagodba naniže (ms)
-        maxBlinkMs: 1000,   // duže od ovoga nije treptaj (dugo zatvaranje ili promjena pogleda)
-        minFrames: 2,       // najmanje kadrova povišenog signala
-        strongAmp: 0.45,    // ili jedan kadar ako je amplituda ovoliko velika
-        gapMs: 200,         // razmak između kadrova veći od ovoga označava loše mjerenje
-        trialEndMs: 1700,   // pokušaj se zaključuje ovoliko poslije signala
-        preMs: 500,         // koliko treptaja prije signala pamtimo
-        postMs: 1500,       // koliko treptaja poslije signala pamtimo
-        badPadPre: 300      // loše mjerenje ovoliko prije signala već poništava pokušaj
+        onDelta: 0.22,      // how far above baseline the score must rise to count as a blink onset
+        offDelta: 0.10,     // blink ends when the score falls back below baseline + this
+        tauUp: 8000,        // slow upward baseline adaptation (ms), e.g. looking down
+        tauDown: 1500,      // faster downward adaptation (ms)
+        maxBlinkMs: 1000,   // longer than this is not a blink (long closure or gaze change)
+        minFrames: 2,       // minimum frames of elevated signal
+        strongAmp: 0.45,    // or a single frame if the amplitude is this large
+        gapMs: 200,         // a gap between frames larger than this marks bad tracking
+        trialEndMs: 1700,   // a trial is finalized this long after the cue
+        preMs: 500,         // how far before the cue blinks are kept
+        postMs: 1500,       // how far after the cue blinks are kept
+        badPadPre: 300      // bad tracking this long before the cue already invalidates the trial
     };
 
     class BlinkDetector {
@@ -407,7 +408,7 @@
                 if (s > c.peak) c.peak = s;
                 if (s > c.base + p.offDelta) {
                     c.frames++;
-                    if (t - c.onset > p.maxBlinkMs) {   // predugo: nije treptaj, prilagodi osnovu
+                    if (t - c.onset > p.maxBlinkMs) {   // too long: not a blink, adapt the baseline
                         this.cand = null;
                         this.b = s;
                     }
@@ -476,7 +477,7 @@
         }
     }
 
-    /* ---------- analiza ---------- */
+    /* ---------- analysis ---------- */
     function hitInfo(trial, win) {
         if (!trial.valid) return { valid: false };
         const w0 = win[0], w1 = win[1];
@@ -497,7 +498,7 @@
     const _lf = [0];
     function logFact(n) { for (let i = _lf.length; i <= n; i++) _lf[i] = _lf[i - 1] + Math.log(i); return _lf[n]; }
     function logC(n, k) { return logFact(n) - logFact(k) - logFact(n - k); }
-    // Jednostrani Fisherov egzaktni test: je li udio u prvoj grupi veći nego u drugoj
+    // One-sided Fisher exact test: is the rate in the first group higher than in the second?
     function fisherGreater(a, b, c, d) {
         const N = a + b + c + d, K = a + c, n = a + b;
         if (N === 0 || n === 0 || N - n === 0) return 1;
@@ -544,11 +545,11 @@
     }
 
     function verdict(o, sh) {
-        if (o.n < 8 || sh.n < 8) return 'malo';
-        if (o.diff <= 0) return 'nema';
-        if (o.p < 0.05 && o.diff >= 0.10) return 'djeluje';
-        if (o.p < 0.15) return 'naznaka';
-        return 'nema';
+        if (o.n < 8 || sh.n < 8) return 'few';
+        if (o.diff <= 0) return 'none';
+        if (o.p < 0.05 && o.diff >= 0.10) return 'works';
+        if (o.p < 0.15) return 'hint';
+        return 'none';
     }
 
     function chanceRate(perMin, win) {
@@ -574,7 +575,7 @@
         };
     }
 
-    /* ---------- raspored ---------- */
+    /* ---------- scheduling ---------- */
     function shuffle(a, rng) {
         rng = rng || Math.random;
         for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
@@ -596,13 +597,14 @@
         module.exports = { DEFAULTS, BlinkDetector, Recorder, hitInfo, wilson, fisherGreater, summarize, verdict, chanceRate, calibSummary, makeDeck, shuffle, nextDelay, median };
     }
 
-    /* ===================== APLIKACIJA ===================== */
+    /* ===================== APP ===================== */
     const $ = (id) => document.getElementById(id);
-    const LABELS = { loom: 'Nalijetanje', dim: 'Zatamnjenje', blur: 'Zamućenje', eye: 'Oko koje trepće', sham: 'Kontrola (bez signala)' };
+    const LABELS = { loom: 'Looming shape', dim: 'Dimming', blur: 'Blur', eye: 'Blinking eye', sham: 'Control (no cue)' };
     const TYPES = ['loom', 'dim', 'blur', 'eye'];
     const MP_VERSIONS = ['0.10.21', '0.10.14', 'latest'];
     const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
-    const STORE_KEY = 'treptaj.v2';
+    const STORE_KEY = 'blinkprobe.v1';
+    const LEGACY_STORE_KEY = 'treptaj.v2'; // key used by the original Bosnian prototype; read as a fallback so existing data survives
 
     const video = $('video');
     const stage = $('stage');
@@ -613,10 +615,10 @@
     const hist = [];                       // [t, score, baseline, blinkFlag]
     const live = { fps: 0, lastT: null, dist: null, luma: null, lastUi: 0 };
 
-    /* ---------- pohrana ---------- */
+    /* ---------- storage ---------- */
     const store = { data: { trials: [], calibs: [], sessions: [], ratings: {}, lastSess: null }, ok: true };
     function loadStore() {
-        try { const raw = localStorage.getItem(STORE_KEY); if (raw) Object.assign(store.data, JSON.parse(raw)); }
+        try { let raw = localStorage.getItem(STORE_KEY); if (raw === null) raw = localStorage.getItem(LEGACY_STORE_KEY); if (raw) Object.assign(store.data, JSON.parse(raw)); }
         catch (e) { store.ok = false; }
     }
     function saveStore() {
@@ -624,7 +626,7 @@
         catch (e) { store.ok = false; $('storeWarn').hidden = false; }
     }
 
-    /* ---------- faze ---------- */
+    /* ---------- phases ---------- */
     function setPhase(p) {
         S.phase = p;
         document.body.dataset.phase = p;
@@ -637,14 +639,14 @@
     }
     document.querySelectorAll('.steps button').forEach(b => b.addEventListener('click', () => setPhase(b.dataset.go)));
 
-    /* ---------- kamera i model ---------- */
+    /* ---------- camera and model ---------- */
     function friendlyCamError(e) {
         const n = e && e.name;
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'Ovaj preglednik ili način otvaranja stranice ne dozvoljava pristup kameri. Otvori fajl u Chromeu, Edgeu ili Firefoxu, ili ga posluži preko localhost (npr. python3 -m http.server).';
-        if (n === 'NotAllowedError' || n === 'SecurityError') return 'Pristup kameri je odbijen. Dozvoli kameru u postavkama preglednika (ikona kamere u adresnoj traci) i pokušaj ponovo.';
-        if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Kamera nije pronađena. Provjeri da je priključena i uključena.';
-        if (n === 'NotReadableError' || n === 'AbortError') return 'Kameru trenutno koristi druga aplikacija. Zatvori je i pokušaj ponovo.';
-        return 'Kamera se nije mogla pokrenuti (' + (n || 'nepoznata greška') + ').';
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'This browser, or the way the page was opened, does not allow camera access. Open the file in Chrome, Edge or Firefox, or serve it over localhost (e.g. python3 -m http.server).';
+        if (n === 'NotAllowedError' || n === 'SecurityError') return 'Camera access was denied. Allow the camera in the browser settings (camera icon in the address bar) and try again.';
+        if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Camera not found. Check that it is plugged in and turned on.';
+        if (n === 'NotReadableError' || n === 'AbortError') return 'The camera is currently in use by another app. Close that app and try again.';
+        return 'Could not start the camera (' + (n || 'unknown error') + ').';
     }
 
     async function loadVision(setMsg) {
@@ -653,15 +655,15 @@
         for (const v of MP_VERSIONS) {
             try {
                 const base = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + v;
-                setMsg('Učitavam biblioteku za prepoznavanje lica…');
+                setMsg('Loading the face-tracking library…');
                 const mod = await import(base + '/vision_bundle.mjs');
                 const fileset = await mod.FilesetResolver.forVisionTasks(base + '/wasm');
-                setMsg('Učitavam model (nekoliko MB, samo prvi put)…');
+                setMsg('Loading the model (a few MB, first time only)…');
                 try { return await mod.FaceLandmarker.createFromOptions(fileset, opts('GPU')); }
                 catch (e) { return await mod.FaceLandmarker.createFromOptions(fileset, opts('CPU')); }
             } catch (e) { lastErr = e; }
         }
-        throw lastErr || new Error('nepoznato');
+        throw lastErr || new Error('unknown');
     }
 
     async function openStream(deviceId) {
@@ -679,9 +681,9 @@
             const sel = $('camSel');
             sel.textContent = '';
             const cur = stream && stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings().deviceId;
-            devs.forEach((d, i) => { const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || ('Kamera ' + (i + 1)); if (d.deviceId === cur) o.selected = true; sel.appendChild(o); });
+            devs.forEach((d, i) => { const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || ('Camera ' + (i + 1)); if (d.deviceId === cur) o.selected = true; sel.appendChild(o); });
             sel.hidden = devs.length < 2;
-        } catch (e) { /* nije bitno */ }
+        } catch (e) { /* optional: ignore enumeration errors */ }
     }
 
     function camMsg(t, err) { const m = $('camMsg'); m.textContent = t; m.className = 'msg' + (err ? ' err' : ''); }
@@ -690,21 +692,21 @@
         const btn = $('camBtn');
         btn.disabled = true;
         try {
-            camMsg('Tražim dozvolu za kameru…');
+            camMsg('Requesting camera permission…');
             await openStream();
         } catch (e) { camMsg(friendlyCamError(e), true); btn.disabled = false; return; }
         try {
             if (!landmarker) landmarker = await loadVision(camMsg);
         } catch (e) {
-            camMsg('Model za prepoznavanje lica se nije mogao učitati. Provjeri internet vezu (treba samo pri učitavanju) i pokušaj ponovo. Detalj: ' + (e && e.message ? e.message : e), true);
+            camMsg('The face-tracking model could not be loaded. Check your internet connection (it is only needed while loading) and try again. Details: ' + (e && e.message ? e.message : e), true);
             if (stream) stream.getTracks().forEach(t => t.stop());
             btn.disabled = false; return;
         }
         await fillCameras();
         S.camReady = true;
         document.body.dataset.cam = 'on';
-        btn.textContent = 'Isključi kameru'; btn.disabled = false; btn.classList.remove('primary');
-        camMsg('Kamera radi.');
+        btn.textContent = 'Disable camera'; btn.disabled = false; btn.classList.remove('primary');
+        camMsg('Camera is working.');
         $('setupHelp').hidden = false;
         startLoop();
         setPhase('setup');
@@ -715,7 +717,7 @@
         if (stream) stream.getTracks().forEach(t => t.stop());
         stream = null; S.camReady = false;
         document.body.dataset.cam = 'off';
-        $('camBtn').textContent = 'Uključi kameru'; $('camBtn').classList.add('primary');
+        $('camBtn').textContent = 'Enable camera'; $('camBtn').classList.add('primary');
         $('setupHelp').hidden = true;
         camMsg('');
         setPhase('setup');
@@ -725,7 +727,7 @@
         try { await openStream($('camSel').value); } catch (e) { camMsg(friendlyCamError(e), true); }
     });
 
-    /* ---------- petlja po kadrovima ---------- */
+    /* ---------- frame loop ---------- */
     function startLoop() {
         if (loopOn) return;
         loopOn = true; lastVT = -1;
@@ -738,11 +740,11 @@
     }
     function onVideoFrame(now, meta) {
         if (!loopOn) return;
-        try { processFrame(now, meta || {}); } catch (e) { /* jedan loš kadar ne smije srušiti petlju */ }
+        try { processFrame(now, meta || {}); } catch (e) { /* one bad frame must not crash the loop */ }
         next();
     }
     function processFrame(now, meta) {
-        // vrijeme stvarnog snimanja kadra (ako preglednik nudi), inače vrijeme obrade
+        // actual capture time of the frame (if the browser provides it), otherwise processing time
         const t = typeof meta.captureTime === 'number' ? meta.captureTime : now;
         let score = null, res = null;
         lastApiTs = Math.max(lastApiTs + 1, now);
@@ -771,7 +773,7 @@
         if (S.phase === 'setup') { drawGraph(t); }
     }
 
-    /* ---------- graf i pokazatelji (korak 1) ---------- */
+    /* ---------- graph and indicators (step 1) ---------- */
     let colCache = null, colAt = 0;
     function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
     function drawGraph(tNow) {
@@ -794,7 +796,7 @@
             hist.forEach(h => { if (h[3]) { c.beginPath(); c.arc(x(h[0]), y(h[1]) - 10, 5, 0, 6.283); c.fill(); } });
         }
         c.fillStyle = colCache.muted; c.font = '18px sans-serif';
-        c.fillText('zatvoreno', 6, y(1) + 16); c.fillText('otvoreno', 6, y(0) - 6);
+        c.fillText('closed', 6, y(1) + 16); c.fillText('open', 6, y(0) - 6);
     }
 
     function setChip(id, text, state) { const li = $(id); li.querySelector('b').textContent = text; if (state) li.dataset.s = state; else delete li.dataset.s; }
@@ -814,33 +816,33 @@
         const stale = rec.lastFrameT == null || now - rec.lastFrameT > 1500;
         const face = S.camReady && !stale && rec.faceOK;
         const tr = $('track');
-        if (!S.camReady) { tr.dataset.state = 'off'; $('trackTxt').textContent = 'kamera isključena'; }
-        else if (face) { tr.dataset.state = 'ok'; $('trackTxt').textContent = 'lice praćeno'; }
-        else { tr.dataset.state = 'warn'; $('trackTxt').textContent = stale ? 'nema slike s kamere' : 'lice nije vidljivo'; }
+        if (!S.camReady) { tr.dataset.state = 'off'; $('trackTxt').textContent = 'camera off'; }
+        else if (face) { tr.dataset.state = 'ok'; $('trackTxt').textContent = 'face tracked'; }
+        else { tr.dataset.state = 'warn'; $('trackTxt').textContent = stale ? 'no camera image' : 'face not visible'; }
 
         if (S.phase === 'setup' && S.camReady) {
             measureLight();
-            setChip('ch-face', face ? 'nađeno' : 'nije vidljivo', face ? 'ok' : 'bad');
+            setChip('ch-face', face ? 'found' : 'not visible', face ? 'ok' : 'bad');
             const f = Math.round(live.fps);
             setChip('ch-fps', f ? String(f) : '–', f >= 24 ? 'ok' : f >= 15 ? 'warn' : 'bad');
             const L = live.luma;
-            setChip('ch-light', L == null ? '–' : L < 70 ? 'slabo' : L > 210 ? 'presvijetlo' : 'dobro', L == null ? null : (L < 70 || L > 210) ? 'warn' : 'ok');
+            setChip('ch-light', L == null ? '–' : L < 70 ? 'low' : L > 210 ? 'too bright' : 'good', L == null ? null : (L < 70 || L > 210) ? 'warn' : 'ok');
             const d = live.dist;
-            setChip('ch-dist', d == null ? '–' : d < 0.18 ? 'predaleko' : d > 0.7 ? 'preblizu' : 'dobro', d == null ? null : (d < 0.18 || d > 0.7) ? 'warn' : 'ok');
+            setChip('ch-dist', d == null ? '–' : d < 0.18 ? 'too far' : d > 0.7 ? 'too close' : 'good', d == null ? null : (d < 0.18 || d > 0.7) ? 'warn' : 'ok');
             setChip('ch-count', String(S.liveCount));
         }
 
         if (S.running) {
             const w = $('warn');
-            if (document.visibilityState !== 'visible') { w.hidden = false; w.textContent = 'Ova kartica nije u prvom planu. Mjerenje je pauzirano dok se ne vratiš.'; }
-            else if (!face) { w.hidden = false; w.textContent = stale ? 'Kamera ne šalje sliku. Provjeri da je uključena.' : 'Lice nije vidljivo. Signali su pauzirani dok se ne vratiš u kadar.'; }
+            if (document.visibilityState !== 'visible') { w.hidden = false; w.textContent = 'This tab is not in the foreground. Measurement is paused until you come back.'; }
+            else if (!face) { w.hidden = false; w.textContent = stale ? 'The camera is not sending an image. Check that it is on.' : 'Face not visible. Cues are paused until you are back in the frame.'; }
             else w.hidden = true;
             updateHud();
         } else $('warn').hidden = true;
     }
     setInterval(uiTick, 500);
 
-    /* ---------- signali ---------- */
+    /* ---------- cues ---------- */
     function emit(type) { window.dispatchEvent(new CustomEvent('blink-signal', { detail: type })); }
     function periphery(size) {
         const W = innerWidth, H = innerHeight;
@@ -906,18 +908,18 @@
         const r = S.run; if (!r) return;
         const el = performance.now() - r.t0;
         if (S.running === 'calib') {
-            $('hudTxt').innerHTML = 'Kalibracija <b>' + fmt(el) + ' / ' + fmt(r.dur) + '</b>';
+            $('hudTxt').innerHTML = 'Calibration <b>' + fmt(el) + ' / ' + fmt(r.dur) + '</b>';
             $('hudBar').style.width = Math.min(100, 100 * el / r.dur) + '%';
         } else {
             const n = S.session ? S.session.n : 0;
-            $('hudTxt').innerHTML = 'Test <b>' + fmt(el) + (r.dur ? ' / ' + fmt(r.dur) : '') + '</b> · pokušaja <b>' + n + '</b>';
+            $('hudTxt').innerHTML = 'Test <b>' + fmt(el) + (r.dur ? ' / ' + fmt(r.dur) : '') + '</b> · trials <b>' + n + '</b>';
             $('hudBar').style.width = r.dur ? Math.min(100, 100 * el / r.dur) + '%' : '0%';
         }
     }
     $('hudStop').addEventListener('click', () => stopRun(true));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.running) stopRun(true); });
 
-    /* ---------- kalibracija ---------- */
+    /* ---------- calibration ---------- */
     function reseed() {
         const calib = store.data.calibs[store.data.calibs.length - 1];
         const recent = hist.slice(-45).map(h => h[1]);
@@ -950,15 +952,15 @@
         $('calResult').hidden = false;
         const box = $('calStats'); box.textContent = '';
         const add = (label, val) => { const d = document.createElement('div'); const s = document.createElement('span'); s.textContent = label; const b = document.createElement('b'); b.textContent = val; d.appendChild(s); d.appendChild(b); box.appendChild(d); };
-        add('Treptaja u minuti', String(cs.perMin));
-        add('Nepotpuni treptaji (procjena)', cs.incompletePct == null ? '–' : cs.incompletePct + '%');
-        add('Tipičan razmak', cs.medianGap == null ? '–' : cs.medianGap + ' s');
-        add('Najduži razmak', cs.maxGap == null ? '–' : cs.maxGap + ' s');
-        add('Ukupno izbrojano', String(cs.count));
+        add('Blinks per minute', String(cs.perMin));
+        add('Incomplete blinks (estimate)', cs.incompletePct == null ? '–' : cs.incompletePct + '%');
+        add('Typical gap', cs.medianGap == null ? '–' : cs.medianGap + ' s');
+        add('Longest gap', cs.maxGap == null ? '–' : cs.maxGap + ' s');
+        add('Total counted', String(cs.count));
         const notes = [];
-        if (cs.lostPct > 25) notes.push('Lice nije bilo vidljivo ' + cs.lostPct + '% vremena. Popravi svjetlo i položaj pa ponovi kalibraciju.');
-        if (cs.perMin < 2 || cs.perMin > 40) notes.push('Ova brojka je neuobičajena. Vrati se na korak 1 i provjeri da graf stvarno prati tvoje treptaje.');
-        if (!notes.length) notes.push('Većina ljudi trepće oko 15 do 20 puta u minuti u opuštenom stanju, a mnogo rjeđe kad se koncentrišu na ekran. Ova brojka služi kao tvoja osnova. Stvarnu procjenu tvojih očiju treba prepustiti očnom ljekaru.');
+        if (cs.lostPct > 25) notes.push('Your face was not visible ' + cs.lostPct + '% of the time. Adjust the lighting and your position, then repeat the calibration.');
+        if (cs.perMin < 2 || cs.perMin > 40) notes.push('This figure is unusual. Go back to step 1 and check that the graph really follows your blinks.');
+        if (!notes.length) notes.push('Most people blink about 15 to 20 times per minute when relaxed, and far less often when concentrating on a screen. This figure serves as your baseline. A real assessment of your eyes is a job for an eye doctor.');
         $('calNote').textContent = notes.join(' ');
     }
     $('calStart').addEventListener('click', startCalib);
@@ -980,7 +982,7 @@
     function startTest() {
         if (!S.camReady || S.running) return;
         const cfg = readSettings();
-        if (!cfg.types.length) { $('testMsg').textContent = 'Odaberi barem jedan signal.'; return; }
+        if (!cfg.types.length) { $('testMsg').textContent = 'Select at least one cue.'; return; }
         $('testMsg').textContent = '';
         const recent = hist.slice(-45).map(h => h[1]);
         rec.reset(); S.liveCount = 0; reseed();
@@ -1017,7 +1019,7 @@
         const type = S.deck.pop();
         requestAnimationFrame((ts) => {
             if (S.running !== 'test') return;
-            const t0 = ts + 16;                       // približno kad je slika stvarno na ekranu
+            const t0 = ts + 16;                       // approximately when the image is actually on screen
             if (type !== 'sham') { SIGNALS[type](cfg.intensity); }
             emit(type);
             rec.beginTrial(type, t0, { id: cfg.id + '-' + (cfg.n + 1), sess: cfg.id, mode: cfg.mode, intensity: +cfg.intensity.toFixed(2), wall: Date.now() });
@@ -1055,7 +1057,7 @@
     function releaseAwake() { try { if (wake) wake.release(); } catch (e) { } wake = null; }
     document.addEventListener('visibilitychange', () => { if (S.running === 'test' && document.visibilityState === 'visible' && !wake) keepAwake(); });
 
-    /* ---------- forma testa ---------- */
+    /* ---------- test form ---------- */
     function syncForm() {
         $('o-int').textContent = $('intensity').value + '%';
         $('o-min').textContent = $('tmin').value + ' s';
@@ -1066,14 +1068,14 @@
         const avg = (Number($('tmin').value) + Math.max(Number($('tmin').value), Number($('tmax').value))) / 2 + 1.8;
         const nT = Math.max(1, document.querySelectorAll('.sig input:checked').length);
         const total = d ? Math.round(d * 60 / avg) : null;
-        $('estN').textContent = total ? ('Oko ' + total + ' pokušaja, ~' + Math.round(total / (nT + Math.max(1, Math.ceil(nT / 2))) ) + ' po signalu. Više pokušaja daje pouzdaniji rezultat.') : 'Test traje dok ga ne zaustaviš.';
+        $('estN').textContent = total ? ('About ' + total + ' trials, ~' + Math.round(total / (nT + Math.max(1, Math.ceil(nT / 2))) ) + ' per cue. More trials give a more reliable result.') : 'The test runs until you stop it.';
     }
     ['intensity', 'tmin', 'tmax', 'adapt', 'tdur'].forEach(id => $(id).addEventListener('input', syncForm));
     document.querySelectorAll('input[name="mode"], .sig input').forEach(el => el.addEventListener('change', syncForm));
     $('tmin').addEventListener('input', () => { if (+$('tmax').value < +$('tmin').value) { $('tmax').value = $('tmin').value; syncForm(); } });
     $('tmax').addEventListener('input', () => { if (+$('tmin').value > +$('tmax').value) { $('tmin').value = $('tmax').value; syncForm(); } });
 
-    /* ---------- vlastiti tekst ---------- */
+    /* ---------- custom text ---------- */
     const defaultReading = readingEl.innerHTML;
     $('ownUse').addEventListener('click', () => {
         const txt = $('ownText').value.trim(); if (!txt) return;
@@ -1082,22 +1084,23 @@
     });
     $('ownReset').addEventListener('click', () => { readingEl.innerHTML = defaultReading; });
 
-    /* ---------- rezultati ---------- */
+    /* ---------- results ---------- */
     function getFilters() { return { scope: $('fScope').value, mode: $('fMode').value, w0: Number($('fW0').value), w1: Number($('fW1').value) }; }
     function pct(x) { return x == null ? '–' : Math.round(x * 100) + '%'; }
-    function pp(x) { return x == null ? '–' : (x >= 0 ? '+' : '−') + Math.abs(Math.round(x * 100)) + ' p.b.'; }
-    function pfmt(p) { return p == null ? '–' : p < 0.001 ? '<0,001' : p.toFixed(3).replace('.', ','); }
-    const VERDICT = { djeluje: 'Djeluje', naznaka: 'Naznaka učinka', nema: 'Nema jasnog učinka', malo: 'Premalo podataka' };
+    function pp(x) { return x == null ? '–' : (x >= 0 ? '+' : '−') + Math.abs(Math.round(x * 100)) + ' pp'; }
+    function pfmt(p) { return p == null ? '–' : p < 0.001 ? '<0.001' : p.toFixed(3); }
+    function pTxt(p) { const s = pfmt(p); return s.charAt(0) === '<' ? 'p < ' + s.slice(1) : 'p = ' + s; }   // 'p = 0.012' or 'p < 0.001' in running text
+    const VERDICT = { works: 'Works', hint: 'Possible effect', none: 'No clear effect', few: 'Too little data' };
 
     function renderResults() {
         const all = store.data.trials;
-        if (!store.data.trials.length) { $('resEmpty').hidden = false; $('resEmpty').textContent = 'Još nema podataka. Odradi test u koraku 3.'; $('resBody').hidden = true; return; }
-        // zadani izbor: način posljednje sesije
+        if (!store.data.trials.length) { $('resEmpty').hidden = false; $('resEmpty').textContent = 'No data yet. Run a test in step 3.'; $('resBody').hidden = true; return; }
+        // default selection: mode of the last session
         if (!renderResults.init) { const last = all[all.length - 1]; if (last) $('fMode').value = last.mode; renderResults.init = true; }
         const f = getFilters();
         let trials = all.filter(t => t.mode === f.mode);
         if (f.scope === 'last' && store.data.lastSess) trials = trials.filter(t => t.sess === store.data.lastSess);
-        if (!trials.length) { $('resEmpty').hidden = false; $('resEmpty').textContent = 'Nema podataka za ovaj izbor. Promijeni način ili obim podataka.'; $('resBody').hidden = true; return; }
+        if (!trials.length) { $('resEmpty').hidden = false; $('resEmpty').textContent = 'No data for this selection. Change the mode or the data scope.'; $('resBody').hidden = true; return; }
         $('resEmpty').hidden = true; $('resBody').hidden = false;
 
         const win = [f.w0, Math.max(f.w0 + 100, f.w1)];
@@ -1105,15 +1108,15 @@
         const R = summarize(trials, win, types);
         const calib = store.data.calibs[store.data.calibs.length - 1];
 
-        // tabela
+        // table
         const body = $('resRows'); body.textContent = '';
         const row = (o, isSham) => {
             const tr = document.createElement('tr');
             const cell = (txt, cls) => { const td = document.createElement('td'); if (cls) td.className = cls; td.textContent = txt; tr.appendChild(td); return td; };
             cell(LABELS[o.key]);
-            cell(o.n + (o.excluded ? ' (' + o.excluded + ' isključeno)' : ''), 'n');
+            cell(o.n + (o.excluded ? ' (' + o.excluded + ' excluded)' : ''), 'n');
             cell(o.n ? o.hits + ' / ' + o.n + ' (' + pct(o.rate) + ')' : '–', 'n');
-            cell(o.n ? pct(o.ci[0]) + ' do ' + pct(o.ci[1]) : '–', 'n');
+            cell(o.n ? pct(o.ci[0]) + ' to ' + pct(o.ci[1]) : '–', 'n');
             cell(isSham ? '–' : pp(o.diff), 'n');
             cell(isSham ? '–' : pfmt(o.p), 'n');
             const v = cell('');
@@ -1125,35 +1128,35 @@
 
         drawPlot(R, types);
 
-        // zaključak
-        const good = types.filter(k => R[k].verdict === 'djeluje' || R[k].verdict === 'naznaka').sort((a, b) => R[b].diff - R[a].diff);
+        // conclusion
+        const good = types.filter(k => R[k].verdict === 'works' || R[k].verdict === 'hint').sort((a, b) => R[b].diff - R[a].diff);
         const c = $('concl'); c.textContent = '';
         const p = document.createElement('p'); p.style.margin = '0';
-        const shamTxt = R.sham.n ? 'U kontrolnim pokušajima (bez signala) trepnuo si u ' + pct(R.sham.rate) + ' slučajeva (n=' + R.sham.n + ').' : '';
-        if (R.sham.n < 8) p.textContent = 'Premalo kontrolnih pokušaja za pouzdano poređenje (' + R.sham.n + '). Nastavi s testom.';
+        const shamTxt = R.sham.n ? 'In control trials (no cue) you blinked in ' + pct(R.sham.rate) + ' of cases (n=' + R.sham.n + ').' : '';
+        if (R.sham.n < 8) p.textContent = 'Too few control trials for a reliable comparison (' + R.sham.n + '). Keep testing.';
         else if (good.length) {
             const b = good[0];
-            p.textContent = shamTxt + ' Najbolji kandidat je „' + LABELS[b] + '“: ' + pct(R[b].rate) + ' treptaja, što je ' + pp(R[b].diff) + ' više od kontrole (' + VERDICT[R[b].verdict].toLowerCase() + ', p=' + pfmt(R[b].p) + ').';
+            p.textContent = shamTxt + ' The best candidate is "' + LABELS[b] + '": a blink followed ' + pct(R[b].rate) + ' of cues, ' + pp(R[b].diff) + ' compared with control (' + VERDICT[R[b].verdict].toLowerCase() + ', ' + pTxt(R[b].p) + ').';
             const rt = store.data.ratings[b];
-            if (rt && rt.annoy >= 4) p.textContent += ' Ocijenio si ga kao jako smetajućeg, pa vrijedi probati nižu jačinu.';
-        } else p.textContent = shamTxt + ' Nijedan signal još jasno ne odskače od kontrole. Probaj veću jačinu ili skupi više pokušaja.';
+            if (rt && rt.annoy >= 4) p.textContent += ' You rated it as very annoying, so a lower intensity is worth trying.';
+        } else p.textContent = shamTxt + ' No cue clearly stands out from control yet. Try a higher intensity or collect more trials.';
         c.appendChild(p);
         if (calib && calib.perMin) {
             const q = document.createElement('p'); q.className = 'small muted'; q.style.margin = '6px 0 0';
-            q.textContent = 'Prema kalibraciji (' + calib.perMin + ' treptaja u minuti) slučajno bi se treptaj u ovom prozoru desio u oko ' + pct(chanceRate(calib.perMin, win)) + ' pokušaja.';
+            q.textContent = 'Based on your calibration (' + calib.perMin + ' blinks per minute), a blink would land in this window by chance in about ' + pct(chanceRate(calib.perMin, win)) + ' of trials.';
             c.appendChild(q);
         }
         const anyEnough = types.some(k => R[k].n >= 8);
-        $('resNote').textContent = 'p.b. znači postotnih bodova. p je vjerovatnoća da bi razlika od kontrole bila ovako velika samo slučajno (jednostrani Fisherov test). Pošto se poredi više signala odjednom, jedan „pozitivan“ rezultat može biti slučajan, pa ga potvrdi ponovnim testom. Isključeni su pokušaji u kojima je lice bilo izgubljeno ili je treptaj već bio u toku.' + (anyEnough ? '' : ' Za pouzdan zaključak treba barem oko 15 do 20 valjanih pokušaja po signalu.');
+        $('resNote').textContent = 'pp means percentage points. p is the probability that a difference from control this large would arise by chance alone (one-sided Fisher exact test). Because several cues are compared at once, a single "positive" result can be a fluke, so confirm it with a repeat test. Trials where the face was lost or a blink was already in progress are excluded.' + (anyEnough ? '' : ' A reliable conclusion needs at least about 15 to 20 valid trials per cue.');
 
-        // ocjene
+        // ratings
         const rb = $('rateRows'); rb.textContent = '';
         types.forEach(k => {
             const tr = document.createElement('tr');
             const td0 = document.createElement('td'); td0.textContent = LABELS[k]; tr.appendChild(td0);
             ['notice', 'annoy'].forEach(field => {
                 const td = document.createElement('td'); const sel = document.createElement('select');
-                sel.setAttribute('aria-label', LABELS[k] + ' – ' + (field === 'notice' ? 'primjetnost' : 'smetnja'));
+                sel.setAttribute('aria-label', LABELS[k] + ' – ' + (field === 'notice' ? 'noticeability' : 'annoyance'));
                 const e = document.createElement('option'); e.value = ''; e.textContent = '–'; sel.appendChild(e);
                 for (let i = 1; i <= 5; i++) { const o = document.createElement('option'); o.value = String(i); o.textContent = String(i); sel.appendChild(o); }
                 const cur = store.data.ratings[k] && store.data.ratings[k][field]; if (cur) sel.value = String(cur);
@@ -1163,17 +1166,17 @@
             rb.appendChild(tr);
         });
 
-        // treptanje
+        // blinking
         const bs = $('blinkStats'); bs.textContent = '';
         const add = (label, val) => { const d = document.createElement('div'); const s = document.createElement('span'); s.textContent = label; const b = document.createElement('b'); b.textContent = val; d.appendChild(s); d.appendChild(b); bs.appendChild(d); };
         const sess = store.data.sessions.filter(s => s.mode === f.mode);
         const lastS = sess[sess.length - 1];
-        add('U kalibraciji (u minuti)', calib ? String(calib.perMin) : '–');
-        add('U testu (u minuti)', lastS ? String(lastS.perMin) : '–');
-        add('Nepotpuni, kalibracija', calib && calib.incompletePct != null ? calib.incompletePct + '%' : '–');
-        add('Nepotpuni, test', lastS && lastS.incompletePct != null ? lastS.incompletePct + '%' : '–');
-        add('Valjanih pokušaja ukupno', String(trials.filter(t => hitInfo(t, win).valid).length));
-        $('blinkNote').textContent = 'Brojka u testu uključuje i treptaje izazvane signalima. Nepotpuni treptaji su procjena iz kamere i manje su pouzdani od ukupnog broja.';
+        add('Calibration (per minute)', calib ? String(calib.perMin) : '–');
+        add('Test (per minute)', lastS ? String(lastS.perMin) : '–');
+        add('Incomplete, calibration', calib && calib.incompletePct != null ? calib.incompletePct + '%' : '–');
+        add('Incomplete, test', lastS && lastS.incompletePct != null ? lastS.incompletePct + '%' : '–');
+        add('Valid trials in total', String(trials.filter(t => hitInfo(t, win).valid).length));
+        $('blinkNote').textContent = 'The test figure also includes blinks triggered by cues. Incomplete blinks are a camera estimate and less reliable than the total count.';
     }
 
     function drawPlot(R, types) {
@@ -1196,9 +1199,9 @@
         }
         rows.forEach((k, i) => {
             const o = R[k], y = top + i * rh + rh / 2;
-            mk('text', { x: left - 12, y: y + 4, 'text-anchor': 'end' }, LABELS[k].replace(' (bez signala)', ''));
+            mk('text', { x: left - 12, y: y + 4, 'text-anchor': 'end' }, LABELS[k].replace(' (no cue)', ''));
             if (!o.n) return;
-            const strong = k !== 'sham' && o.verdict === 'djeluje';
+            const strong = k !== 'sham' && o.verdict === 'works';
             const col = k === 'sham' ? 'var(--muted)' : 'var(--accent)';
             mk('line', { x1: X(o.ci[0]), x2: X(o.ci[1]), y1: y, y2: y, stroke: col, 'stroke-width': 2.5, 'stroke-linecap': 'round' });
             mk('circle', { cx: X(o.rate), cy: y, r: 6, fill: (strong || k === 'sham') ? col : 'var(--bg)', stroke: col, 'stroke-width': 2 });
@@ -1213,31 +1216,31 @@
         a.download = name; document.body.appendChild(a); a.click();
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     }
-    $('rJson').addEventListener('click', () => download('treptaj-podaci.json', JSON.stringify(store.data, null, 1), 'application/json'));
+    $('rJson').addEventListener('click', () => download('blinkprobe-data.json', JSON.stringify(store.data, null, 1), 'application/json'));
     $('rCsv').addEventListener('click', () => {
         const f = getFilters(), win = [f.w0, Math.max(f.w0 + 100, f.w1)];
-        const lines = ['sesija;nacin;signal;jacina;vrijeme;valjan;pogodak;kasnjenje_ms;treptaji_ms'];
+        const lines = ['session,mode,cue,intensity,time,valid,hit,latency_ms,blink_onsets_ms'];
         store.data.trials.forEach(t => {
             const h = hitInfo(t, win);
-            lines.push([t.sess, t.mode, t.type, t.intensity, new Date(t.wall).toISOString(), h.valid ? 1 : 0, h.valid ? (h.hit ? 1 : 0) : '', h.lat == null ? '' : Math.round(h.lat), t.blinks.map(b => b.on).join('|')].join(';'));
+            lines.push([t.sess, t.mode, t.type, t.intensity, new Date(t.wall).toISOString(), h.valid ? 1 : 0, h.valid ? (h.hit ? 1 : 0) : '', h.lat == null ? '' : Math.round(h.lat), t.blinks.map(b => b.on).join('|')].join(','));
         });
-        download('treptaj-pokusaji.csv', lines.join('\n'), 'text/csv');
+        download('blinkprobe-trials.csv', lines.join('\n'), 'text/csv');
     });
     $('rClear').addEventListener('click', () => {
-        if (!confirm('Obrisati sve rezultate, kalibracije i ocjene s ovog računara?')) return;
+        if (!confirm('Delete all results, calibrations and ratings stored on this computer?')) return;
         store.data = { trials: [], calibs: [], sessions: [], ratings: {}, lastSess: null };
         saveStore(); renderResults.init = false; setPhase('setup');
     });
     $('toCalib').addEventListener('click', () => setPhase('calib'));
 
-    /* ---------- pokretanje ---------- */
+    /* ---------- startup ---------- */
     loadStore();
     if (!store.ok) $('storeWarn').hidden = false;
     document.body.dataset.cam = 'off';
     if (store.data.calibs.length) showCalibResult(store.data.calibs[store.data.calibs.length - 1]);
     syncForm();
     setPhase('setup');
-    window.__lab = { S, store, rec };   // za dijagnostiku
+    window.__blinkprobe = { S, store, rec };   // for diagnostics in the browser console
 
 </script>
 </body>
