@@ -1,0 +1,16 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Dependencies / build output (none required, kept for local experiments)
+node_modules/
+dist/
+
+# Logs
+*.log

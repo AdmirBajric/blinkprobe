@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>BlinkProbe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+    <style>
+        :root {
+            --bg: #f3f5f7; --fg: #1d232b; --muted: #5b6672; --line: #d5dbe1; --panel: #e8ecf0;
+            --accent: #1f7a72; --accent-fg: #ffffff; --signal: #20262d;
+            --ok: #2b7a4b; --warn: #a56a0c; --bad: #b3402f;
+            --ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            --read: "Newsreader", Georgia, "Times New Roman", serif;
+            box-sizing: border-box;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg: #12161b; --fg: #d9dee5; --muted: #8b96a3; --line: #252c34; --panel: #1a2027;
+                --accent: #6fb7b0; --accent-fg: #0d1416; --signal: #e8eef4;
+                --ok: #62c08a; --warn: #e0b45a; --bad: #e57c6b;
+            }
+        }
+        :root[data-theme="dark"] {
+            --bg: #12161b; --fg: #d9dee5; --muted: #8b96a3; --line: #252c34; --panel: #1a2027;
+            --accent: #6fb7b0; --accent-fg: #0d1416; --signal: #e8eef4;
+            --ok: #62c08a; --warn: #e0b45a; --bad: #e57c6b;
+        }
+        html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100%; background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 16px; line-height: 1.5; }
+        h1, h2, h3 { line-height: 1.25; }
+        h2 { font-size: 1.375rem; font-weight: 600; margin: 0 0 8px; }
+        h3 { font-size: 1rem; font-weight: 600; margin: 0 0 8px; }
+        p { margin: 0 0 12px; }
+        .lead { max-width: 64ch; color: var(--fg); }
+        .muted { color: var(--muted); }
+        .small { font-size: .875rem; }
+
+        /* zaglavlje */
+        .bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+            padding: 10px clamp(16px, 4vw, 40px); background: var(--bg); border-bottom: 1px solid var(--line); }
+        .bar h1 { font-size: 1rem; font-weight: 600; margin: 0; }
+        .steps { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+        .steps button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+        .steps button span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); font-size: .75rem; }
+        .steps button[aria-current="step"] { color: var(--fg); background: var(--panel); font-weight: 600; }
+        .steps button[aria-current="step"] span { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+        .steps button:disabled { opacity: .45; cursor: not-allowed; }
+        .track { display: inline-flex; align-items: center; gap: 8px; font-size: .8125rem; color: var(--muted); }
+        .track i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: inline-block; }
+        .track[data-state="ok"] i { background: var(--ok); }
+        .track[data-state="warn"] i { background: var(--warn); }
+
+        button, select, input { font: inherit; color: inherit; }
+        button { cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); padding: 8px 14px; }
+        button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+        button.tiny { padding: 3px 10px; font-size: .8125rem; }
+        button.danger { color: var(--bad); }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        select, input[type="number"] { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+        input[type="range"] { width: 100%; accent-color: var(--accent); }
+        input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+        textarea { width: 100%; min-height: 120px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: inherit; }
+        kbd { font-family: var(--ui); font-size: .8125rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; background: var(--panel); }
+
+        .wrap { max-width: 980px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 80px; }
+        .page { display: none; }
+        body[data-phase="setup"] #p-setup, body[data-phase="calib"] #p-calib, body[data-phase="test"] #p-test, body[data-phase="results"] #p-results { display: block; }
+        .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 14px 0; }
+        .card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--panel); margin: 16px 0; }
+        .msg { min-height: 1.5em; font-size: .9375rem; }
+        .msg.err { color: var(--bad); }
+        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+        .field .lbl { display: flex; justify-content: space-between; color: var(--muted); font-size: .875rem; }
+
+        /* monitor */
+        .monitor { display: none; grid-template-columns: 260px 1fr; gap: 20px; margin: 18px 0; align-items: start; }
+        body[data-cam="on"][data-phase="setup"] .monitor { display: grid; }
+        body:not([data-phase="setup"]) .monitor, body[data-cam="off"] .monitor {
+            display: grid; position: absolute; width: 2px; height: 2px; overflow: hidden; opacity: 0; pointer-events: none; }
+        .mon-video { border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+        .mon-video video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+        #graph { width: 100%; height: 110px; display: block; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+        .chips { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+        .chips li { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; display: flex; flex-direction: column; }
+        .chips li span { font-size: .75rem; color: var(--muted); }
+        .chips li b { font-weight: 600; }
+        .chips li[data-s="ok"] b { color: var(--ok); }
+        .chips li[data-s="warn"] b { color: var(--warn); }
+        .chips li[data-s="bad"] b { color: var(--bad); }
+        @media (max-width: 720px) { .monitor { grid-template-columns: 1fr !important; } .mon-video { max-width: 320px; } }
+        ol.check { padding-left: 20px; margin: 8px 0; }
+        ol.check li { margin: 4px 0; }
+
+        /* HUD */
+        #hud { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 52px); z-index: 25; display: flex; align-items: center; gap: 14px; padding: 8px clamp(16px, 4vw, 40px);
+            background: var(--bg); border-bottom: 1px solid var(--line); font-size: .875rem; color: var(--muted); }
+        #hud[hidden] { display: none; }
+        #hud .prog { flex: 1; height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; }
+        #hud .prog i { display: block; height: 100%; width: 0; background: var(--accent); }
+        #hud b { color: var(--fg); font-weight: 500; font-variant-numeric: tabular-nums; }
+        #warn { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 92px); z-index: 24; background: var(--warn); color: #fff; padding: 8px clamp(16px, 4vw, 40px); font-size: .875rem; }
+        #warn[hidden] { display: none; }
+
+        /* tekst za čitanje */
+        .read { display: none; max-width: 62ch; margin: 28px auto 0; font-family: var(--read); font-size: clamp(1.125rem, 1.6vw, 1.3125rem); line-height: 1.65; }
+        body[data-phase="calib"] .read, body[data-phase="test"] .read { display: block; }
+        .read h2 { font-family: var(--read); font-weight: 500; font-size: 1.75rem; margin: 0 0 18px; }
+        .read p { margin: 0 0 1.1em; }
+        details.own { max-width: 62ch; margin: 24px auto 0; font-size: .9375rem; display: none; }
+        body[data-phase="calib"] details.own, body[data-phase="test"] details.own { display: block; }
+        details.own summary { cursor: pointer; color: var(--muted); }
+
+        /* signali - forma */
+        .sig { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+        .sig:first-of-type { border-top: 0; }
+        .sig input { margin-top: 5px; }
+        .sig .t { flex: 1; }
+        .sig .t b { font-weight: 500; display: block; }
+        .sig .t span { font-size: .8125rem; color: var(--muted); }
+        .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        @media (max-width: 720px) { .two { grid-template-columns: 1fr; gap: 0; } }
+        .opt { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; }
+        .opt input { margin-top: 5px; }
+        .opt span small { display: block; color: var(--muted); font-size: .8125rem; }
+
+        /* rezultati */
+        .table-wrap { overflow-x: auto; max-width: 100%; }
+        table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .9375rem; }
+        th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+        th { font-weight: 500; color: var(--muted); font-size: .8125rem; }
+        td.n { font-variant-numeric: tabular-nums; }
+        .chip { display: inline-block; padding: 1px 10px; border-radius: 999px; border: 1px solid currentColor; font-size: .8125rem; white-space: nowrap; }
+        .chip.djeluje { color: var(--ok); } .chip.naznaka { color: var(--warn); } .chip.nema { color: var(--muted); } .chip.malo { color: var(--muted); border-style: dashed; }
+        #plot { width: 100%; height: auto; display: block; margin: 8px 0; }
+        #plot text { fill: var(--muted); font-family: var(--ui); font-size: 12px; }
+        .filters { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: end; margin: 12px 0 4px; }
+        .filters label { display: flex; flex-direction: column; gap: 4px; font-size: .8125rem; color: var(--muted); }
+        .filters input[type="number"] { width: 92px; }
+        .concl { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 16px 0; max-width: 70ch; }
+        .stat-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 8px 0; }
+        .stat-list div { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+        .stat-list span { font-size: .75rem; color: var(--muted); display: block; }
+        .stat-list b { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+        #stage { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
+
+    </style>
+</head>
+<body>
+<header class="bar">
+    <h1>BlinkProbe</h1>
+    <nav class="steps" aria-label="Koraci">
+        <button type="button" data-go="setup"><span>1</span>Kamera</button>
+        <button type="button" data-go="calib"><span>2</span>Kalibracija</button>
+        <button type="button" data-go="test"><span>3</span>Test</button>
+        <button type="button" data-go="results"><span>4</span>Rezultati</button>
+    </nav>
+    <span id="track" class="track" data-state="off"><i></i><b id="trackTxt" style="font-weight:400">kamera isključena</b></span>
+</header>
+
+<div id="hud" hidden>
+    <span id="hudTxt">–</span>
+    <div class="prog"><i id="hudBar"></i></div>
+    <button id="hudStop" type="button">Zaustavi</button>
+</div>
+<div id="warn" role="alert" hidden></div>
+
+<main class="wrap">
+
+    <!-- 1. KAMERA -->
+    <section id="p-setup" class="page">
+        <h2>Kamera i provjera</h2>
+        <p class="lead">Kamera služi samo za brojanje treptaja. Slika se obrađuje u ovom prozoru i nikad se ne snima niti šalje. S interneta se preuzimaju samo programska biblioteka i model za prepoznavanje lica, i to pri učitavanju kamere.</p>
+        <div class="row">
+            <button id="camBtn" type="button" class="primary">Uključi kameru</button>
+            <select id="camSel" hidden aria-label="Odabir kamere"></select>
+        </div>
+        <p id="camMsg" class="msg" role="status"></p>
+
+        <div id="monitor" class="monitor">
+            <div class="mon-video"><video id="video" playsinline muted></video></div>
+            <div>
+                <canvas id="graph" width="720" height="220" aria-label="Graf zatvorenosti očiju u posljednjih 8 sekundi"></canvas>
+                <ul class="chips">
+                    <li id="ch-face"><span>Lice</span><b>–</b></li>
+                    <li id="ch-fps"><span>Kadrova u sekundi</span><b>–</b></li>
+                    <li id="ch-light"><span>Svjetlo</span><b>–</b></li>
+                    <li id="ch-dist"><span>Udaljenost</span><b>–</b></li>
+                    <li id="ch-count"><span>Treptaja (uživo)</span><b>0</b></li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="setupHelp" hidden>
+            <h3>Prije nastavka</h3>
+            <ol class="check">
+                <li>Trepni nekoliko puta. Na grafu se moraju pojaviti skokovi, a brojač treptaja mora rasti.</li>
+                <li>Svjetlo treba biti ispred tebe, ne iza. Refleksije na naočalima smanjuju tačnost.</li>
+                <li>Sjedi na uobičajenoj udaljenosti od monitora, s kamerom što bliže gornjoj ivici ekrana.</li>
+                <li>Kad gledaš u tekst na ekranu, oči su spuštene. Provjeri da i tada lice ostaje praćeno.</li>
+            </ol>
+            <div class="row"><button id="toCalib" type="button" class="primary">Dalje: kalibracija</button></div>
+        </div>
+    </section>
+
+    <!-- 2. KALIBRACIJA -->
+    <section id="p-calib" class="page">
+        <div id="calibForm">
+            <h2>Kalibracija</h2>
+            <p class="lead">Čitaj tekst ispod kao inače, bez ikakvih signala. Aplikacija mjeri koliko trepćeš i koliko su ti oči obično otvorene. To je osnova za poređenje.</p>
+            <div class="row">
+                <label>Trajanje
+                    <select id="calDur">
+                        <option value="0.5">30 s (samo za probu)</option>
+                        <option value="1">1 min</option>
+                        <option value="2" selected>2 min</option>
+                        <option value="3">3 min</option>
+                    </select>
+                </label>
+                <button id="calStart" type="button" class="primary">Počni kalibraciju</button>
+                <button id="calSkip" type="button">Preskoči</button>
+            </div>
+            <div id="calResult" class="card" hidden>
+                <h3>Rezultat kalibracije</h3>
+                <div id="calStats" class="stat-list"></div>
+                <p id="calNote" class="small muted"></p>
+                <div class="row"><button id="calNext" type="button" class="primary">Dalje: test</button><button id="calAgain" type="button">Ponovi kalibraciju</button></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. TEST -->
+    <section id="p-test" class="page">
+        <div id="testForm">
+            <h2>Test signala</h2>
+            <p class="lead">Čitaj tekst ispod. Signali se pojavljuju sami. Među njima su i <b>kontrolni pokušaji bez ikakvog signala</b>, koji služe da se vidi koliko bi treptaja bilo i inače. Nemoj ništa pritiskati.</p>
+            <div class="two">
+                <div>
+                    <h3>Signali</h3>
+                    <div class="sig"><input type="checkbox" id="c-loom" checked aria-labelledby="l-loom"><div class="t"><b id="l-loom">Nalijetanje</b><span>Mali oblik pored teksta brzo naraste, kao da se približava.</span></div><button class="tiny" type="button" data-preview="loom">Prikaži</button></div>
+                    <div class="sig"><input type="checkbox" id="c-dim" checked aria-labelledby="l-dim"><div class="t"><b id="l-dim">Zatamnjenje</b><span>Cijeli ekran se na trenutak blago zatamni.</span></div><button class="tiny" type="button" data-preview="dim">Prikaži</button></div>
+                    <div class="sig"><input type="checkbox" id="c-blur" checked aria-labelledby="l-blur"><div class="t"><b id="l-blur">Zamućenje</b><span>Tekst se na trenutak malo zamuti.</span></div><button class="tiny" type="button" data-preview="blur">Prikaži</button></div>
+                    <div class="sig"><input type="checkbox" id="c-eye" checked aria-labelledby="l-eye"><div class="t"><b id="l-eye">Oko koje trepće</b><span>Sićušno oko pored teksta dva puta trepne.</span></div><button class="tiny" type="button" data-preview="eye">Prikaži</button></div>
+                    <p class="small muted" style="margin-top:10px">Svaki signal je jedan kratak impuls, nikad treperenje.</p>
+                </div>
+                <div>
+                    <div class="field">
+                        <div class="lbl"><span>Jačina signala</span><output id="o-int">40%</output></div>
+                        <input type="range" id="intensity" min="0" max="100" value="40" aria-label="Jačina signala">
+                    </div>
+                    <div class="field">
+                        <div class="lbl"><span>Najkraći razmak između signala</span><output id="o-min">8 s</output></div>
+                        <input type="range" id="tmin" min="3" max="60" value="8" aria-label="Najkraći razmak u sekundama">
+                        <div class="lbl"><span>Najduži razmak</span><output id="o-max">16 s</output></div>
+                        <input type="range" id="tmax" min="3" max="90" value="16" aria-label="Najduži razmak u sekundama">
+                    </div>
+                    <div class="field">
+                        <div class="lbl"><span>Način</span></div>
+                        <label class="opt"><input type="radio" name="mode" value="random" checked><span>Nasumično<small>Signali dolaze neovisno o tvom treptanju. Najčišće mjerenje.</small></span></label>
+                        <label class="opt"><input type="radio" name="mode" value="adaptive"><span>Adaptivno<small>Signal (i kontrola) dolazi tek kad nisi trepnuo određeno vrijeme. Ovako bi radila gotova aplikacija.</small></span></label>
+                    </div>
+                    <div class="field" id="adaptField" hidden>
+                        <div class="lbl"><span>Bez treptaja najmanje</span><output id="o-ad">8 s</output></div>
+                        <input type="range" id="adapt" min="4" max="20" value="8" aria-label="Sekundi bez treptaja prije signala">
+                    </div>
+                    <div class="field">
+                        <label class="lbl" for="tdur"><span>Trajanje testa</span></label>
+                        <select id="tdur">
+                            <option value="2">2 min (samo za probu rada)</option>
+                            <option value="10">10 min</option>
+                            <option value="20" selected>20 min</option>
+                            <option value="30">30 min</option>
+                            <option value="45">45 min</option>
+                            <option value="0">Dok ne zaustavim</option>
+                        </select>
+                        <span id="estN" class="small muted"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <button id="testStart" type="button" class="primary">Počni test</button>
+                <span id="testMsg" class="msg err" role="alert"></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- tekst za čitanje (kalibracija i test) -->
+    <article id="reading" class="read">
+        <h2>Zašto premalo trepćemo pred ekranom</h2>
+        <p>Kad zurimo u ekran, trepćemo otprilike upola rjeđe nego inače. Uobičajeno je oko petnaest do dvadeset treptaja u minuti, a tokom koncentrisanog rada taj broj može pasti na osam ili deset. Osim toga, mnogi treptaji su nepotpuni: kapak se spusti tek napola i suzni film se ne obnovi do kraja.</p>
+        <p>Suzni film je tanak sloj tečnosti koji drži rožnjaču vlažnom i glatkom. Kad ga dugo ne obnavljamo, počinje da isparava, površina oka postaje neravna, a slika se blago zamuti. Tada oko peče, svrbi ili djeluje kao da u njemu ima pijeska. Tegobe najčešće dolaze predvečer, poslije više sati pred monitorom.</p>
+        <p>Sam treptaj traje otprilike desetinku do dvije desetinke sekunde. Za to vrijeme kapak razmaže suzni film preko rožnjače, a žlijezde na rubu kapka ispuste tanak sloj ulja koji usporava isparavanje. Kad su treptaji rijetki ili nepotpuni, taj sloj se slabije obnavlja, a donji dio rožnjače ostaje izloženiji zraku.</p>
+        <p>Treptanje nije samo mehaničko čišćenje. Mozak ga koristi i kao male pauze: trepćemo na kraju rečenice, kad okrenemo stranicu ili kad završimo neku misao. Zato duboka koncentracija i rijetko treptanje idu zajedno.</p>
+        <p>Ljudi trepću i refleksno. Dodir rožnjače, iznenadna svjetlost ili nešto što naglo leti prema licu izazivaju treptaj bez naše odluke. Čini se da tokom duboke usredotočenosti spontano treptanje slabi, dok refleksi ostaju, i upravo na to se ovdje računa.</p>
+        <p>Poznato pravilo dvadeset-dvadeset-dvadeset savjetuje da svakih dvadesetak minuta na dvadesetak sekundi pogledaš nešto što je udaljeno oko šest metara. Ono opušta mišiće za fokusiranje, a usput najčešće natjera i na nekoliko punih treptaja.</p>
+        <p>Na isparavanje utiču i vlažnost zraka, strujanje iz klima-uređaja ili ventilatora i položaj monitora. Kad gledamo prema gore, oko je šire otvoreno i izloženo je više njegove površine, pa monitor postavljen malo ispod nivoa očiju obično znači manje isparavanja.</p>
+        <p>Ako ti se oči redovno suše, peku ili muće pred kraj dana, vrijedi razgovarati s očnim ljekarom. Umjetne suze i dobre navike pomažu, ali uzrok nije uvijek samo ekran.</p>
+        <p>Dok čitaš, ne traži signale pogledom i ne pokušavaj kontrolisati treptanje. Cilj je da se oči ponašaju onako kako se inače ponašaju tokom rada.</p>
+    </article>
+    <details class="own">
+        <summary>Radije čitaš vlastiti tekst?</summary>
+        <p class="small muted" style="margin-top:8px">Zalijepi bilo koji tekst (članak, e-poštu, dokument) i čitaj njega umjesto ponuđenog.</p>
+        <textarea id="ownText" aria-label="Vlastiti tekst"></textarea>
+        <div class="row"><button id="ownUse" type="button" class="tiny">Koristi ovaj tekst</button><button id="ownReset" type="button" class="tiny">Vrati ponuđeni tekst</button></div>
+    </details>
+
+    <!-- 4. REZULTATI -->
+    <section id="p-results" class="page">
+        <h2>Rezultati</h2>
+        <p class="lead">Za svaki signal se broji koliko puta si trepnuo u prozoru odgovora poslije signala, i to se poredi s kontrolnim pokušajima bez signala. Signal pomaže samo ako je udio treptaja jasno veći nego u kontroli.</p>
+
+        <div class="filters">
+            <label>Podaci
+                <select id="fScope"><option value="all">Sve sesije</option><option value="last">Samo posljednja sesija</option></select>
+            </label>
+            <label>Način
+                <select id="fMode"><option value="random">Nasumično</option><option value="adaptive">Adaptivno</option></select>
+            </label>
+            <label>Prozor odgovora od (ms)
+                <input type="number" id="fW0" value="100" min="0" max="800" step="50">
+            </label>
+            <label>do (ms)
+                <input type="number" id="fW1" value="1000" min="300" max="1500" step="50">
+            </label>
+        </div>
+
+        <div id="resEmpty" class="card" hidden>Još nema podataka za ovaj izbor. Odradi test u koraku 3.</div>
+        <div id="resBody">
+            <div id="concl" class="concl"></div>
+            <svg id="plot" role="img" aria-label="Udio treptaja poslije svakog signala i u kontroli, s 95% rasponom"></svg>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Signal</th><th>Valjanih pokušaja</th><th>Treptaj u prozoru</th><th>95% raspon</th><th>Razlika od kontrole</th><th>p</th><th>Ocjena</th><th>Kašnjenje</th></tr></thead>
+                    <tbody id="resRows"></tbody>
+                </table>
+            </div>
+            <p id="resNote" class="small muted"></p>
+
+            <h3 style="margin-top:28px">Tvoj utisak</h3>
+            <p class="small muted">Ocijeni poslije testa. 1 znači jedva primjetno ili nimalo smetnje, 5 znači vrlo primjetno ili vrlo smeta.</p>
+            <div class="table-wrap"><table style="min-width:420px">
+                <thead><tr><th>Signal</th><th>Primjetnost</th><th>Smetnja</th></tr></thead>
+                <tbody id="rateRows"></tbody>
+            </table></div>
+
+            <h3 style="margin-top:28px">Tvoje treptanje</h3>
+            <div id="blinkStats" class="stat-list"></div>
+            <p id="blinkNote" class="small muted"></p>
+        </div>
+
+        <div class="row" style="margin-top:28px">
+            <button id="rNew" type="button" class="primary">Novi test</button>
+            <button id="rJson" type="button">Preuzmi podatke (JSON)</button>
+            <button id="rCsv" type="button">Preuzmi pokušaje (CSV)</button>
+            <button id="rClear" type="button" class="danger">Obriši sve podatke</button>
+        </div>
+        <p id="storeWarn" class="small err msg" hidden>Preglednik ne dozvoljava spremanje podataka. Rezultati će ostati samo dok je ova stranica otvorena. Preuzmi ih prije zatvaranja.</p>
+    </section>
+</main>
+<div id="stage" aria-hidden="true"></div>
+
+<script type="module">
+    /* ===================== JEZGRO (bez DOM-a, testirano u Node-u) ===================== */
+    const DEFAULTS = {
+        onDelta: 0.22,      // koliko iznad osnovnog nivoa oko mora "pasti" da se broji kao početak treptaja
+        offDelta: 0.10,     // treptaj je gotov kad se vrati ispod osnove + ovo
+        tauUp: 8000,        // spora prilagodba osnove naviše (ms), npr. pogled prema dolje
+        tauDown: 1500,      // brža prilagodba naniže (ms)
+        maxBlinkMs: 1000,   // duže od ovoga nije treptaj (dugo zatvaranje ili promjena pogleda)
+        minFrames: 2,       // najmanje kadrova povišenog signala
+        strongAmp: 0.45,    // ili jedan kadar ako je amplituda ovoliko velika
+        gapMs: 200,         // razmak između kadrova veći od ovoga označava loše mjerenje
+        trialEndMs: 1700,   // pokušaj se zaključuje ovoliko poslije signala
+        preMs: 500,         // koliko treptaja prije signala pamtimo
+        postMs: 1500,       // koliko treptaja poslije signala pamtimo
+        badPadPre: 300      // loše mjerenje ovoliko prije signala već poništava pokušaj
+    };
+
+    class BlinkDetector {
+        constructor(p) { this.p = Object.assign({}, DEFAULTS, p || {}); this.reset(); }
+        reset() { this.b = null; this.cand = null; this.lastT = null; this.lastBlinkOnset = -Infinity; this.lastBlinkEnd = -Infinity; }
+        seed(b) { this.b = b; }
+        get inBlink() { return !!this.cand; }
+        lost() { this.cand = null; this.lastT = null; }
+        update(t, s) {
+            const p = this.p;
+            const dt = this.lastT == null ? 0 : Math.max(0, t - this.lastT);
+            this.lastT = t;
+            if (this.b == null) this.b = s;
+            let ev = null;
+            if (!this.cand) {
+                if (s >= this.b + p.onDelta) {
+                    this.cand = { onset: t, peak: s, frames: 1, base: this.b };
+                } else if (s < this.b) {
+                    this.b += (s - this.b) * (1 - Math.exp(-dt / p.tauDown));
+                } else if (s < this.b + p.onDelta * 0.6) {
+                    this.b += (s - this.b) * (1 - Math.exp(-dt / p.tauUp));
+                }
+            } else {
+                const c = this.cand;
+                if (s > c.peak) c.peak = s;
+                if (s > c.base + p.offDelta) {
+                    c.frames++;
+                    if (t - c.onset > p.maxBlinkMs) {   // predugo: nije treptaj, prilagodi osnovu
+                        this.cand = null;
+                        this.b = s;
+                    }
+                } else {
+                    const dur = t - c.onset;
+                    const amp = c.peak - c.base;
+                    this.cand = null;
+                    if ((c.frames >= p.minFrames || amp >= p.strongAmp) && dur <= p.maxBlinkMs) {
+                        ev = {
+                            on: c.onset, end: t, dur, peak: c.peak, base: c.base,
+                            complete: c.peak >= c.base + 0.5 * (1 - c.base)
+                        };
+                        this.lastBlinkOnset = c.onset;
+                        this.lastBlinkEnd = t;
+                    }
+                }
+            }
+            return ev;
+        }
+    }
+
+    class Recorder {
+        constructor(p) { this.p = Object.assign({}, DEFAULTS, p || {}); this.det = new BlinkDetector(this.p); this.onTrial = null; this.reset(); }
+        reset() {
+            this.det.reset();
+            this.blinks = []; this.bad = []; this.pending = [];
+            this.lastFrameT = null; this.lostSince = null; this.frames = 0;
+        }
+        get faceOK() { return this.lostSince == null && this.lastFrameT != null; }
+        onFrame(t, score) {
+            const p = this.p;
+            if (this.lastFrameT != null && this.lostSince == null && t - this.lastFrameT > p.gapMs) this.bad.push([this.lastFrameT, t]);
+            let ev = null;
+            if (score == null) {
+                if (this.lostSince == null) { this.lostSince = this.lastFrameT != null ? this.lastFrameT : t; this.det.lost(); }
+            } else {
+                if (this.lostSince != null) { this.bad.push([this.lostSince, t]); this.lostSince = null; }
+                ev = this.det.update(t, score);
+                if (ev) this.blinks.push(ev);
+            }
+            this.lastFrameT = t; this.frames++;
+            this._finalize(t);
+            if (this.bad.length > 400) this.bad = this.bad.slice(-200);
+            return ev;
+        }
+        beginTrial(type, t0, meta) {
+            this.pending.push(Object.assign({ type, t0 }, meta || {}));
+        }
+        discardPending() { this.pending = []; }
+        _finalize(t) {
+            if (!this.pending.length) return;
+            const p = this.p, rest = [];
+            for (const tr of this.pending) {
+                if (t < tr.t0 + p.trialEndMs) { rest.push(tr); continue; }
+                const lo = tr.t0 - p.preMs, hi = tr.t0 + p.postMs;
+                const blinks = this.blinks
+                    .filter(b => b.end >= lo && b.on <= hi)
+                    .map(b => ({ on: Math.round(b.on - tr.t0), end: Math.round(b.end - tr.t0), peak: +b.peak.toFixed(2), complete: b.complete }));
+                let bad = this.bad.some(([s, e]) => s < hi && e > tr.t0 - p.badPadPre);
+                if (this.lostSince != null && this.lostSince < hi) bad = true;
+                const rec = Object.assign({}, tr, { valid: !bad, reason: bad ? 'tracking' : '', blinks });
+                delete rec.t0;
+                if (this.onTrial) this.onTrial(rec);
+            }
+            this.pending = rest;
+        }
+    }
+
+    /* ---------- analiza ---------- */
+    function hitInfo(trial, win) {
+        if (!trial.valid) return { valid: false };
+        const w0 = win[0], w1 = win[1];
+        for (const b of trial.blinks) if (b.on < w0 && b.end > -150) return { valid: false, pre: true };
+        let hit = false, lat = null;
+        for (const b of trial.blinks) if (b.on >= w0 && b.on <= w1) { hit = true; if (lat == null || b.on < lat) lat = b.on; }
+        return { valid: true, hit, lat };
+    }
+
+    function wilson(k, n, z) {
+        z = z || 1.96;
+        if (!n) return [0, 1];
+        const p = k / n, z2 = z * z, d = 1 + z2 / n, c = p + z2 / (2 * n);
+        const m = z * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n));
+        return [Math.max(0, (c - m) / d), Math.min(1, (c + m) / d)];
+    }
+
+    const _lf = [0];
+    function logFact(n) { for (let i = _lf.length; i <= n; i++) _lf[i] = _lf[i - 1] + Math.log(i); return _lf[n]; }
+    function logC(n, k) { return logFact(n) - logFact(k) - logFact(n - k); }
+    // Jednostrani Fisherov egzaktni test: je li udio u prvoj grupi veći nego u drugoj
+    function fisherGreater(a, b, c, d) {
+        const N = a + b + c + d, K = a + c, n = a + b;
+        if (N === 0 || n === 0 || N - n === 0) return 1;
+        let p = 0;
+        for (let x = a; x <= Math.min(n, K); x++) {
+            if (n - x > N - K) continue;
+            p += Math.exp(logC(K, x) + logC(N - K, n - x) - logC(N, n));
+        }
+        return Math.min(1, p);
+    }
+
+    function median(arr) {
+        if (!arr.length) return null;
+        const s = arr.slice().sort((x, y) => x - y), m = s.length >> 1;
+        return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    }
+
+    function summarize(trials, win, types) {
+        const out = {};
+        const keys = types.concat(['sham']);
+        for (const k of keys) out[k] = { key: k, n: 0, hits: 0, excluded: 0, lats: [] };
+        for (const tr of trials) {
+            const o = out[tr.type];
+            if (!o) continue;
+            const h = hitInfo(tr, win);
+            if (!h.valid) { o.excluded++; continue; }
+            o.n++;
+            if (h.hit) { o.hits++; o.lats.push(h.lat); }
+        }
+        for (const k of keys) {
+            const o = out[k];
+            o.rate = o.n ? o.hits / o.n : null;
+            o.ci = wilson(o.hits, o.n);
+            o.medLat = median(o.lats);
+        }
+        const sh = out.sham;
+        for (const k of types) {
+            const o = out[k];
+            o.diff = (o.n && sh.n) ? o.rate - sh.rate : null;
+            o.p = (o.n && sh.n) ? fisherGreater(o.hits, o.n - o.hits, sh.hits, sh.n - sh.hits) : null;
+            o.verdict = verdict(o, sh);
+        }
+        return out;
+    }
+
+    function verdict(o, sh) {
+        if (o.n < 8 || sh.n < 8) return 'malo';
+        if (o.diff <= 0) return 'nema';
+        if (o.p < 0.05 && o.diff >= 0.10) return 'djeluje';
+        if (o.p < 0.15) return 'naznaka';
+        return 'nema';
+    }
+
+    function chanceRate(perMin, win) {
+        return 1 - Math.exp(-(perMin / 60) * ((win[1] - win[0]) / 1000));
+    }
+
+    function calibSummary(blinks, bad, t0, t1) {
+        const durMs = Math.max(1, t1 - t0);
+        let badMs = 0;
+        for (const [s, e] of bad) { const a = Math.max(s, t0), b = Math.min(e, t1); if (b > a) badMs += b - a; }
+        const effMin = Math.max(0.01, (durMs - badMs) / 60000);
+        const inR = blinks.filter(b => b.on >= t0 && b.on <= t1);
+        const iv = [];
+        for (let i = 1; i < inR.length; i++) iv.push((inR[i].on - inR[i - 1].on) / 1000);
+        return {
+            minutes: +effMin.toFixed(2),
+            count: inR.length,
+            perMin: +(inR.length / effMin).toFixed(1),
+            incompletePct: inR.length ? Math.round(100 * inR.filter(b => !b.complete).length / inR.length) : null,
+            medianGap: iv.length ? +median(iv).toFixed(1) : null,
+            maxGap: iv.length ? +Math.max.apply(null, iv).toFixed(1) : null,
+            lostPct: Math.round(100 * badMs / durMs)
+        };
+    }
+
+    /* ---------- raspored ---------- */
+    function shuffle(a, rng) {
+        rng = rng || Math.random;
+        for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+        return a;
+    }
+    function makeDeck(types, rng) {
+        const d = types.slice();
+        const nSham = Math.max(1, Math.ceil(types.length / 2));
+        for (let i = 0; i < nSham; i++) d.push('sham');
+        return shuffle(d, rng);
+    }
+    function nextDelay(minS, maxS, rng) {
+        rng = rng || Math.random;
+        const lo = Math.min(minS, maxS), hi = Math.max(minS, maxS);
+        return (lo + rng() * (hi - lo)) * 1000;
+    }
+
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = { DEFAULTS, BlinkDetector, Recorder, hitInfo, wilson, fisherGreater, summarize, verdict, chanceRate, calibSummary, makeDeck, shuffle, nextDelay, median };
+    }
+
+    /* ===================== APLIKACIJA ===================== */
+    const $ = (id) => document.getElementById(id);
+    const LABELS = { loom: 'Nalijetanje', dim: 'Zatamnjenje', blur: 'Zamućenje', eye: 'Oko koje trepće', sham: 'Kontrola (bez signala)' };
+    const TYPES = ['loom', 'dim', 'blur', 'eye'];
+    const MP_VERSIONS = ['0.10.21', '0.10.14', 'latest'];
+    const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+    const STORE_KEY = 'treptaj.v2';
+
+    const video = $('video');
+    const stage = $('stage');
+    const readingEl = $('reading');
+    const rec = new Recorder();
+    const S = { phase: 'setup', running: null, camReady: false, session: null, tm: null, deck: [], liveCount: 0 };
+    let landmarker = null, stream = null, loopOn = false, lastApiTs = 0, lastVT = -1;
+    const hist = [];                       // [t, score, baseline, blinkFlag]
+    const live = { fps: 0, lastT: null, dist: null, luma: null, lastUi: 0 };
+
+    /* ---------- pohrana ---------- */
+    const store = { data: { trials: [], calibs: [], sessions: [], ratings: {}, lastSess: null }, ok: true };
+    function loadStore() {
+        try { const raw = localStorage.getItem(STORE_KEY); if (raw) Object.assign(store.data, JSON.parse(raw)); }
+        catch (e) { store.ok = false; }
+    }
+    function saveStore() {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(store.data)); }
+        catch (e) { store.ok = false; $('storeWarn').hidden = false; }
+    }
+
+    /* ---------- faze ---------- */
+    function setPhase(p) {
+        S.phase = p;
+        document.body.dataset.phase = p;
+        document.querySelectorAll('.steps button').forEach(b => {
+            b.setAttribute('aria-current', b.dataset.go === p ? 'step' : 'false');
+            b.disabled = !!S.running || (b.dataset.go !== 'setup' && b.dataset.go !== 'results' && !S.camReady) || (b.dataset.go === 'results' && !store.data.trials.length && p !== 'results');
+        });
+        if (p === 'results') renderResults();
+        window.scrollTo(0, 0);
+    }
+    document.querySelectorAll('.steps button').forEach(b => b.addEventListener('click', () => setPhase(b.dataset.go)));
+
+    /* ---------- kamera i model ---------- */
+    function friendlyCamError(e) {
+        const n = e && e.name;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'Ovaj preglednik ili način otvaranja stranice ne dozvoljava pristup kameri. Otvori fajl u Chromeu, Edgeu ili Firefoxu, ili ga posluži preko localhost (npr. python3 -m http.server).';
+        if (n === 'NotAllowedError' || n === 'SecurityError') return 'Pristup kameri je odbijen. Dozvoli kameru u postavkama preglednika (ikona kamere u adresnoj traci) i pokušaj ponovo.';
+        if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Kamera nije pronađena. Provjeri da je priključena i uključena.';
+        if (n === 'NotReadableError' || n === 'AbortError') return 'Kameru trenutno koristi druga aplikacija. Zatvori je i pokušaj ponovo.';
+        return 'Kamera se nije mogla pokrenuti (' + (n || 'nepoznata greška') + ').';
+    }
+
+    async function loadVision(setMsg) {
+        let lastErr = null;
+        const opts = (delegate) => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate }, outputFaceBlendshapes: true, runningMode: 'VIDEO', numFaces: 1 });
+        for (const v of MP_VERSIONS) {
+            try {
+                const base = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + v;
+                setMsg('Učitavam biblioteku za prepoznavanje lica…');
+                const mod = await import(base + '/vision_bundle.mjs');
+                const fileset = await mod.FilesetResolver.forVisionTasks(base + '/wasm');
+                setMsg('Učitavam model (nekoliko MB, samo prvi put)…');
+                try { return await mod.FaceLandmarker.createFromOptions(fileset, opts('GPU')); }
+                catch (e) { return await mod.FaceLandmarker.createFromOptions(fileset, opts('CPU')); }
+            } catch (e) { lastErr = e; }
+        }
+        throw lastErr || new Error('nepoznato');
+    }
+
+    async function openStream(deviceId) {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        const v = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } };
+        if (deviceId) v.deviceId = { exact: deviceId }; else v.facingMode = 'user';
+        stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: false });
+        video.srcObject = stream;
+        await video.play();
+    }
+
+    async function fillCameras() {
+        try {
+            const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+            const sel = $('camSel');
+            sel.textContent = '';
+            const cur = stream && stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings().deviceId;
+            devs.forEach((d, i) => { const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || ('Kamera ' + (i + 1)); if (d.deviceId === cur) o.selected = true; sel.appendChild(o); });
+            sel.hidden = devs.length < 2;
+        } catch (e) { /* nije bitno */ }
+    }
+
+    function camMsg(t, err) { const m = $('camMsg'); m.textContent = t; m.className = 'msg' + (err ? ' err' : ''); }
+
+    async function enableCamera() {
+        const btn = $('camBtn');
+        btn.disabled = true;
+        try {
+            camMsg('Tražim dozvolu za kameru…');
+            await openStream();
+        } catch (e) { camMsg(friendlyCamError(e), true); btn.disabled = false; return; }
+        try {
+            if (!landmarker) landmarker = await loadVision(camMsg);
+        } catch (e) {
+            camMsg('Model za prepoznavanje lica se nije mogao učitati. Provjeri internet vezu (treba samo pri učitavanju) i pokušaj ponovo. Detalj: ' + (e && e.message ? e.message : e), true);
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            btn.disabled = false; return;
+        }
+        await fillCameras();
+        S.camReady = true;
+        document.body.dataset.cam = 'on';
+        btn.textContent = 'Isključi kameru'; btn.disabled = false; btn.classList.remove('primary');
+        camMsg('Kamera radi.');
+        $('setupHelp').hidden = false;
+        startLoop();
+        setPhase('setup');
+    }
+
+    function disableCamera() {
+        loopOn = false;
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        stream = null; S.camReady = false;
+        document.body.dataset.cam = 'off';
+        $('camBtn').textContent = 'Uključi kameru'; $('camBtn').classList.add('primary');
+        $('setupHelp').hidden = true;
+        camMsg('');
+        setPhase('setup');
+    }
+    $('camBtn').addEventListener('click', () => { if (S.camReady) disableCamera(); else enableCamera(); });
+    $('camSel').addEventListener('change', async () => {
+        try { await openStream($('camSel').value); } catch (e) { camMsg(friendlyCamError(e), true); }
+    });
+
+    /* ---------- petlja po kadrovima ---------- */
+    function startLoop() {
+        if (loopOn) return;
+        loopOn = true; lastVT = -1;
+        next();
+    }
+    function next() {
+        if (!loopOn) return;
+        if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(onVideoFrame);
+        else requestAnimationFrame((ts) => { if (video.currentTime !== lastVT) { lastVT = video.currentTime; onVideoFrame(ts, {}); } else next(); });
+    }
+    function onVideoFrame(now, meta) {
+        if (!loopOn) return;
+        try { processFrame(now, meta || {}); } catch (e) { /* jedan loš kadar ne smije srušiti petlju */ }
+        next();
+    }
+    function processFrame(now, meta) {
+        // vrijeme stvarnog snimanja kadra (ako preglednik nudi), inače vrijeme obrade
+        const t = typeof meta.captureTime === 'number' ? meta.captureTime : now;
+        let score = null, res = null;
+        lastApiTs = Math.max(lastApiTs + 1, now);
+        res = landmarker.detectForVideo(video, lastApiTs);
+        if (res && res.faceBlendshapes && res.faceBlendshapes.length) {
+            let l = null, r = null;
+            const cats = res.faceBlendshapes[0].categories;
+            for (let i = 0; i < cats.length; i++) {
+                const n = cats[i].categoryName;
+                if (n === 'eyeBlinkLeft') l = cats[i].score; else if (n === 'eyeBlinkRight') r = cats[i].score;
+            }
+            if (l != null && r != null) score = (l + r) / 2;
+        }
+        if (live.lastT != null) { const dt = t - live.lastT; if (dt > 0) live.fps = live.fps ? live.fps * 0.9 + (1000 / dt) * 0.1 : 1000 / dt; }
+        live.lastT = t;
+        if (score != null && res.faceLandmarks && res.faceLandmarks[0] && (rec.frames % 8 === 0)) {
+            let mn = 1, mx = 0; const pts = res.faceLandmarks[0];
+            for (let i = 0; i < pts.length; i++) { const x = pts[i].x; if (x < mn) mn = x; if (x > mx) mx = x; }
+            live.dist = mx - mn;
+        }
+        const ev = rec.onFrame(t, score);
+        if (ev) S.liveCount++;
+        if (score != null) { hist.push([t, score, rec.det.b, ev ? 1 : 0]); }
+        while (hist.length && hist[0][0] < t - 10000) hist.shift();
+        if (!S.running && rec.blinks.length > 60) rec.blinks.splice(0, rec.blinks.length - 20);
+        if (S.phase === 'setup') { drawGraph(t); }
+    }
+
+    /* ---------- graf i pokazatelji (korak 1) ---------- */
+    let colCache = null, colAt = 0;
+    function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+    function drawGraph(tNow) {
+        const cv = $('graph'); const c = cv.getContext('2d');
+        if (!colCache || tNow - colAt > 2000) { colCache = { fg: cssVar('--fg'), muted: cssVar('--muted'), acc: cssVar('--accent'), line: cssVar('--line'), bg: cssVar('--bg') }; colAt = tNow; }
+        const W = cv.width, H = cv.height, span = 8000, pad = 8;
+        c.clearRect(0, 0, W, H);
+        const y = v => H - pad - Math.min(1, Math.max(0, v)) * (H - 2 * pad);
+        const x = t => (t - (tNow - span)) / span * W;
+        c.strokeStyle = colCache.line; c.lineWidth = 1; c.beginPath();
+        for (const g of [0, 0.5, 1]) { c.moveTo(0, y(g)); c.lineTo(W, y(g)); } c.stroke();
+        if (hist.length > 1) {
+            const last = hist[hist.length - 1];
+            c.setLineDash([6, 6]); c.strokeStyle = colCache.muted; c.beginPath();
+            c.moveTo(0, y(last[2] + rec.p.onDelta)); c.lineTo(W, y(last[2] + rec.p.onDelta)); c.stroke(); c.setLineDash([]);
+            c.strokeStyle = colCache.acc; c.lineWidth = 2; c.beginPath();
+            hist.forEach((h, i) => { const px = x(h[0]), py = y(h[1]); if (i) c.lineTo(px, py); else c.moveTo(px, py); });
+            c.stroke();
+            c.fillStyle = colCache.acc;
+            hist.forEach(h => { if (h[3]) { c.beginPath(); c.arc(x(h[0]), y(h[1]) - 10, 5, 0, 6.283); c.fill(); } });
+        }
+        c.fillStyle = colCache.muted; c.font = '18px sans-serif';
+        c.fillText('zatvoreno', 6, y(1) + 16); c.fillText('otvoreno', 6, y(0) - 6);
+    }
+
+    function setChip(id, text, state) { const li = $(id); li.querySelector('b').textContent = text; if (state) li.dataset.s = state; else delete li.dataset.s; }
+    const probe = document.createElement('canvas'); probe.width = 32; probe.height = 24;
+    function measureLight() {
+        try {
+            const c = probe.getContext('2d', { willReadFrequently: true });
+            c.drawImage(video, 0, 0, 32, 24);
+            const d = c.getImageData(0, 0, 32, 24).data; let sum = 0;
+            for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            live.luma = sum / (d.length / 4);
+        } catch (e) { live.luma = null; }
+    }
+
+    function uiTick() {
+        const now = performance.now();
+        const stale = rec.lastFrameT == null || now - rec.lastFrameT > 1500;
+        const face = S.camReady && !stale && rec.faceOK;
+        const tr = $('track');
+        if (!S.camReady) { tr.dataset.state = 'off'; $('trackTxt').textContent = 'kamera isključena'; }
+        else if (face) { tr.dataset.state = 'ok'; $('trackTxt').textContent = 'lice praćeno'; }
+        else { tr.dataset.state = 'warn'; $('trackTxt').textContent = stale ? 'nema slike s kamere' : 'lice nije vidljivo'; }
+
+        if (S.phase === 'setup' && S.camReady) {
+            measureLight();
+            setChip('ch-face', face ? 'nađeno' : 'nije vidljivo', face ? 'ok' : 'bad');
+            const f = Math.round(live.fps);
+            setChip('ch-fps', f ? String(f) : '–', f >= 24 ? 'ok' : f >= 15 ? 'warn' : 'bad');
+            const L = live.luma;
+            setChip('ch-light', L == null ? '–' : L < 70 ? 'slabo' : L > 210 ? 'presvijetlo' : 'dobro', L == null ? null : (L < 70 || L > 210) ? 'warn' : 'ok');
+            const d = live.dist;
+            setChip('ch-dist', d == null ? '–' : d < 0.18 ? 'predaleko' : d > 0.7 ? 'preblizu' : 'dobro', d == null ? null : (d < 0.18 || d > 0.7) ? 'warn' : 'ok');
+            setChip('ch-count', String(S.liveCount));
+        }
+
+        if (S.running) {
+            const w = $('warn');
+            if (document.visibilityState !== 'visible') { w.hidden = false; w.textContent = 'Ova kartica nije u prvom planu. Mjerenje je pauzirano dok se ne vratiš.'; }
+            else if (!face) { w.hidden = false; w.textContent = stale ? 'Kamera ne šalje sliku. Provjeri da je uključena.' : 'Lice nije vidljivo. Signali su pauzirani dok se ne vratiš u kadar.'; }
+            else w.hidden = true;
+            updateHud();
+        } else $('warn').hidden = true;
+    }
+    setInterval(uiTick, 500);
+
+    /* ---------- signali ---------- */
+    function emit(type) { window.dispatchEvent(new CustomEvent('blink-signal', { detail: type })); }
+    function periphery(size) {
+        const W = innerWidth, H = innerHeight;
+        const r = readingEl.getBoundingClientRect();
+        const need = size + 60, sides = [];
+        if (r.width > 0 && r.left > need) sides.push('L');
+        if (r.width > 0 && W - r.right > need) sides.push('R');
+        const y = H * (0.25 + Math.random() * 0.5);
+        let x;
+        if (sides.length) {
+            const side = sides[Math.floor(Math.random() * sides.length)];
+            const room = side === 'L' ? r.left : W - r.right;
+            const off = size / 2 + 24 + Math.random() * Math.max(0, room - size - 48) * 0.6;
+            x = side === 'L' ? r.left - off : r.right + off;
+        } else x = Math.random() < 0.5 ? size / 2 + 8 : W - size / 2 - 8;
+        return { x: Math.min(W - size / 2 - 4, Math.max(size / 2 + 4, x)), y };
+    }
+    function sigLoom(i) {
+        const size = 34 + i * 110, start = 8 / size, peak = 0.12 + i * 0.6;
+        const p = periphery(size);
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;border-radius:50%;opacity:0;width:' + size + 'px;height:' + size + 'px;left:' + (p.x - size / 2) + 'px;top:' + (p.y - size / 2) + 'px;background:radial-gradient(circle, var(--signal) 0%, var(--signal) 58%, transparent 74%);';
+        stage.appendChild(el);
+        el.animate([
+            { transform: 'scale(' + start + ')', opacity: 0, offset: 0 },
+            { transform: 'scale(' + (start * 1.8) + ')', opacity: peak, offset: 0.2 },
+            { transform: 'scale(1)', opacity: peak, offset: 0.85 },
+            { transform: 'scale(1.06)', opacity: 0, offset: 1 }
+        ], { duration: 520, easing: 'cubic-bezier(.5,0,.9,.6)' }).onfinish = () => el.remove();
+    }
+    function sigDim(i) {
+        const peak = 0.06 + i * 0.4;
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;inset:0;background:#000;opacity:0;';
+        stage.appendChild(el);
+        el.animate([{ opacity: 0, offset: 0 }, { opacity: peak, offset: 0.3 }, { opacity: peak, offset: 0.5 }, { opacity: 0, offset: 1 }], { duration: 480, easing: 'ease-in-out' }).onfinish = () => el.remove();
+    }
+    function sigBlur(i) {
+        const px = 0.6 + i * 3.2;
+        readingEl.animate([{ filter: 'blur(0px)' }, { filter: 'blur(' + px + 'px)', offset: 0.4 }, { filter: 'blur(0px)' }], { duration: 560, easing: 'ease-in-out' });
+    }
+    function sigEye(i) {
+        const w = 30 + i * 50, peak = 0.25 + i * 0.6, dur = 900;
+        const p = periphery(w);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:absolute;opacity:0;color:var(--signal);width:' + w + 'px;left:' + (p.x - w / 2) + 'px;top:' + (p.y - w * 0.3) + 'px;';
+        wrap.innerHTML = '<svg viewBox="0 0 60 36" width="100%" style="display:block;overflow:visible"><g class="lid" style="transform-box:fill-box;transform-origin:center"><path d="M3 18 Q30 -2 57 18 Q30 38 3 18Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><circle cx="30" cy="18" r="8" fill="currentColor"/><circle cx="30" cy="18" r="3.4" fill="var(--bg)"/></g></svg>';
+        stage.appendChild(wrap);
+        wrap.querySelector('.lid').animate([
+            { transform: 'scaleY(1)', offset: 0 }, { transform: 'scaleY(1)', offset: 0.22 }, { transform: 'scaleY(0.06)', offset: 0.32 },
+            { transform: 'scaleY(1)', offset: 0.44 }, { transform: 'scaleY(1)', offset: 0.58 }, { transform: 'scaleY(0.06)', offset: 0.68 },
+            { transform: 'scaleY(1)', offset: 0.8 }, { transform: 'scaleY(1)', offset: 1 }
+        ], { duration: dur, easing: 'ease-in-out' });
+        wrap.animate([{ opacity: 0, offset: 0 }, { opacity: peak, offset: 0.15 }, { opacity: peak, offset: 0.9 }, { opacity: 0, offset: 1 }], { duration: dur }).onfinish = () => wrap.remove();
+    }
+    const SIGNALS = { loom: sigLoom, dim: sigDim, blur: sigBlur, eye: sigEye };
+    const inten = () => Number($('intensity').value) / 100;
+    document.querySelectorAll('[data-preview]').forEach(b => b.addEventListener('click', () => SIGNALS[b.dataset.preview](inten())));
+
+    /* ---------- HUD ---------- */
+    const fmt = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+    function updateHud() {
+        const r = S.run; if (!r) return;
+        const el = performance.now() - r.t0;
+        if (S.running === 'calib') {
+            $('hudTxt').innerHTML = 'Kalibracija <b>' + fmt(el) + ' / ' + fmt(r.dur) + '</b>';
+            $('hudBar').style.width = Math.min(100, 100 * el / r.dur) + '%';
+        } else {
+            const n = S.session ? S.session.n : 0;
+            $('hudTxt').innerHTML = 'Test <b>' + fmt(el) + (r.dur ? ' / ' + fmt(r.dur) : '') + '</b> · pokušaja <b>' + n + '</b>';
+            $('hudBar').style.width = r.dur ? Math.min(100, 100 * el / r.dur) + '%' : '0%';
+        }
+    }
+    $('hudStop').addEventListener('click', () => stopRun(true));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.running) stopRun(true); });
+
+    /* ---------- kalibracija ---------- */
+    function reseed() {
+        const calib = store.data.calibs[store.data.calibs.length - 1];
+        const recent = hist.slice(-45).map(h => h[1]);
+        if (recent.length >= 10) rec.det.seed(median(recent));
+        else if (calib && calib.base != null) rec.det.seed(calib.base);
+    }
+    function startCalib() {
+        if (!S.camReady || S.running) return;
+        const recent = hist.slice(-45).map(h => h[1]);
+        rec.reset(); S.liveCount = 0;
+        if (recent.length >= 10) rec.det.seed(median(recent));
+        const dur = Number($('calDur').value) * 60000;
+        S.running = 'calib'; S.run = { t0: performance.now(), dur };
+        $('calibForm').hidden = true; $('hud').hidden = false;
+        clearInterval(S.calTimer);
+        S.calTimer = setInterval(() => { if (S.running === 'calib' && performance.now() - S.run.t0 >= dur) finishCalib(); }, 250);
+        setPhase('calib'); updateHud();
+    }
+    function finishCalib() {
+        clearInterval(S.calTimer);
+        const t1 = performance.now(), t0 = S.run.t0;
+        const bad = rec.bad.slice(); if (rec.lostSince != null) bad.push([rec.lostSince, t1]);
+        const cs = calibSummary(rec.blinks, bad, t0, t1);
+        cs.ts = Date.now(); cs.base = rec.det.b != null ? +rec.det.b.toFixed(3) : null;
+        store.data.calibs.push(cs); saveStore();
+        S.running = null; S.run = null; $('hud').hidden = true; $('calibForm').hidden = false;
+        showCalibResult(cs); setPhase('calib');
+    }
+    function showCalibResult(cs) {
+        $('calResult').hidden = false;
+        const box = $('calStats'); box.textContent = '';
+        const add = (label, val) => { const d = document.createElement('div'); const s = document.createElement('span'); s.textContent = label; const b = document.createElement('b'); b.textContent = val; d.appendChild(s); d.appendChild(b); box.appendChild(d); };
+        add('Treptaja u minuti', String(cs.perMin));
+        add('Nepotpuni treptaji (procjena)', cs.incompletePct == null ? '–' : cs.incompletePct + '%');
+        add('Tipičan razmak', cs.medianGap == null ? '–' : cs.medianGap + ' s');
+        add('Najduži razmak', cs.maxGap == null ? '–' : cs.maxGap + ' s');
+        add('Ukupno izbrojano', String(cs.count));
+        const notes = [];
+        if (cs.lostPct > 25) notes.push('Lice nije bilo vidljivo ' + cs.lostPct + '% vremena. Popravi svjetlo i položaj pa ponovi kalibraciju.');
+        if (cs.perMin < 2 || cs.perMin > 40) notes.push('Ova brojka je neuobičajena. Vrati se na korak 1 i provjeri da graf stvarno prati tvoje treptaje.');
+        if (!notes.length) notes.push('Većina ljudi trepće oko 15 do 20 puta u minuti u opuštenom stanju, a mnogo rjeđe kad se koncentrišu na ekran. Ova brojka služi kao tvoja osnova. Stvarnu procjenu tvojih očiju treba prepustiti očnom ljekaru.');
+        $('calNote').textContent = notes.join(' ');
+    }
+    $('calStart').addEventListener('click', startCalib);
+    $('calAgain').addEventListener('click', () => { $('calResult').hidden = true; startCalib(); });
+    $('calSkip').addEventListener('click', () => setPhase('test'));
+    $('calNext').addEventListener('click', () => setPhase('test'));
+
+    /* ---------- test ---------- */
+    function readSettings() {
+        const types = TYPES.filter(k => $('c-' + k).checked);
+        return {
+            types, intensity: inten(),
+            tmin: Number($('tmin').value), tmax: Math.max(Number($('tmin').value), Number($('tmax').value)),
+            mode: document.querySelector('input[name="mode"]:checked').value,
+            adaptMs: Number($('adapt').value) * 1000,
+            dur: Number($('tdur').value) * 60000
+        };
+    }
+    function startTest() {
+        if (!S.camReady || S.running) return;
+        const cfg = readSettings();
+        if (!cfg.types.length) { $('testMsg').textContent = 'Odaberi barem jedan signal.'; return; }
+        $('testMsg').textContent = '';
+        const recent = hist.slice(-45).map(h => h[1]);
+        rec.reset(); S.liveCount = 0; reseed();
+        if (recent.length >= 10) rec.det.seed(median(recent));
+        S.session = Object.assign({ id: 'S' + Date.now(), n: 0, startedAt: Date.now() }, cfg);
+        store.data.lastSess = S.session.id;
+        rec.onTrial = onTrialDone;
+        S.deck = []; S.running = 'test';
+        S.run = { t0: performance.now(), dur: cfg.dur };
+        $('testForm').hidden = true; $('hud').hidden = false;
+        keepAwake();
+        setPhase('test'); updateHud();
+        scheduleNext(true);
+    }
+    function scheduleNext(first) {
+        clearTimeout(S.tm);
+        const cfg = S.session;
+        const delay = first ? 5000 + Math.random() * 3000 : nextDelay(cfg.tmin, cfg.tmax);
+        S.waitSince = null;
+        S.tm = setTimeout(tryFire, delay);
+    }
+    function tryFire() {
+        if (S.running !== 'test') return;
+        const now = performance.now(), cfg = S.session;
+        if (cfg.dur && now - S.run.t0 >= cfg.dur) { stopRun(false); return; }
+        const fresh = rec.lastFrameT != null && now - rec.lastFrameT < 500;
+        let ok = document.visibilityState === 'visible' && fresh && rec.faceOK && !rec.det.inBlink && (now - rec.det.lastBlinkEnd > 150);
+        if (ok && cfg.mode === 'adaptive') ok = (now - rec.det.lastBlinkOnset) >= cfg.adaptMs;
+        if (ok) fire(); else S.tm = setTimeout(tryFire, 100);
+    }
+    function fire() {
+        const cfg = S.session;
+        if (!S.deck.length) S.deck = makeDeck(cfg.types);
+        const type = S.deck.pop();
+        requestAnimationFrame((ts) => {
+            if (S.running !== 'test') return;
+            const t0 = ts + 16;                       // približno kad je slika stvarno na ekranu
+            if (type !== 'sham') { SIGNALS[type](cfg.intensity); }
+            emit(type);
+            rec.beginTrial(type, t0, { id: cfg.id + '-' + (cfg.n + 1), sess: cfg.id, mode: cfg.mode, intensity: +cfg.intensity.toFixed(2), wall: Date.now() });
+        });
+        S.tm = setTimeout(tryFire, 1800 + nextDelay(cfg.tmin, cfg.tmax));
+        S.waitSince = null;
+    }
+    function onTrialDone(tr) {
+        if (S.session) S.session.n++;
+        store.data.trials.push(tr);
+        saveStore();
+    }
+    function stopRun(manual) {
+        if (S.running === 'calib') {
+            clearInterval(S.calTimer);
+            S.running = null; S.run = null; $('hud').hidden = true; $('calibForm').hidden = false; setPhase('calib');
+            return;
+        }
+        if (S.running !== 'test') return;
+        clearTimeout(S.tm);
+        const t1 = performance.now(), t0 = S.run.t0;
+        rec.discardPending();
+        const bad = rec.bad.slice(); if (rec.lostSince != null) bad.push([rec.lostSince, t1]);
+        const cs = calibSummary(rec.blinks, bad, t0, t1);
+        store.data.sessions.push({ id: S.session.id, ts: Date.now(), mode: S.session.mode, types: S.session.types, intensity: S.session.intensity, minutes: cs.minutes, perMin: cs.perMin, incompletePct: cs.incompletePct, trials: S.session.n });
+        saveStore();
+        S.running = null; S.run = null; $('hud').hidden = true; $('testForm').hidden = false; $('warn').hidden = true;
+        releaseAwake();
+        setPhase('results');
+    }
+    $('testStart').addEventListener('click', startTest);
+
+    let wake = null;
+    async function keepAwake() { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; } }
+    function releaseAwake() { try { if (wake) wake.release(); } catch (e) { } wake = null; }
+    document.addEventListener('visibilitychange', () => { if (S.running === 'test' && document.visibilityState === 'visible' && !wake) keepAwake(); });
+
+    /* ---------- forma testa ---------- */
+    function syncForm() {
+        $('o-int').textContent = $('intensity').value + '%';
+        $('o-min').textContent = $('tmin').value + ' s';
+        $('o-max').textContent = $('tmax').value + ' s';
+        $('o-ad').textContent = $('adapt').value + ' s';
+        $('adaptField').hidden = document.querySelector('input[name="mode"]:checked').value !== 'adaptive';
+        const d = Number($('tdur').value);
+        const avg = (Number($('tmin').value) + Math.max(Number($('tmin').value), Number($('tmax').value))) / 2 + 1.8;
+        const nT = Math.max(1, document.querySelectorAll('.sig input:checked').length);
+        const total = d ? Math.round(d * 60 / avg) : null;
+        $('estN').textContent = total ? ('Oko ' + total + ' pokušaja, ~' + Math.round(total / (nT + Math.max(1, Math.ceil(nT / 2))) ) + ' po signalu. Više pokušaja daje pouzdaniji rezultat.') : 'Test traje dok ga ne zaustaviš.';
+    }
+    ['intensity', 'tmin', 'tmax', 'adapt', 'tdur'].forEach(id => $(id).addEventListener('input', syncForm));
+    document.querySelectorAll('input[name="mode"], .sig input').forEach(el => el.addEventListener('change', syncForm));
+    $('tmin').addEventListener('input', () => { if (+$('tmax').value < +$('tmin').value) { $('tmax').value = $('tmin').value; syncForm(); } });
+    $('tmax').addEventListener('input', () => { if (+$('tmin').value > +$('tmax').value) { $('tmin').value = $('tmax').value; syncForm(); } });
+
+    /* ---------- vlastiti tekst ---------- */
+    const defaultReading = readingEl.innerHTML;
+    $('ownUse').addEventListener('click', () => {
+        const txt = $('ownText').value.trim(); if (!txt) return;
+        readingEl.textContent = '';
+        txt.split(/\n{1,}/).forEach(par => { if (par.trim()) { const p = document.createElement('p'); p.textContent = par.trim(); readingEl.appendChild(p); } });
+    });
+    $('ownReset').addEventListener('click', () => { readingEl.innerHTML = defaultReading; });
+
+    /* ---------- rezultati ---------- */
+    function getFilters() { return { scope: $('fScope').value, mode: $('fMode').value, w0: Number($('fW0').value), w1: Number($('fW1').value) }; }
+    function pct(x) { return x == null ? '–' : Math.round(x * 100) + '%'; }
+    function pp(x) { return x == null ? '–' : (x >= 0 ? '+' : '−') + Math.abs(Math.round(x * 100)) + ' p.b.'; }
+    function pfmt(p) { return p == null ? '–' : p < 0.001 ? '<0,001' : p.toFixed(3).replace('.', ','); }
+    const VERDICT = { djeluje: 'Djeluje', naznaka: 'Naznaka učinka', nema: 'Nema jasnog učinka', malo: 'Premalo podataka' };
+
+    function renderResults() {
+        const all = store.data.trials;
+        if (!store.data.trials.length) { $('resEmpty').hidden = false; $('resEmpty').textContent = 'Još nema podataka. Odradi test u koraku 3.'; $('resBody').hidden = true; return; }
+        // zadani izbor: način posljednje sesije
+        if (!renderResults.init) { const last = all[all.length - 1]; if (last) $('fMode').value = last.mode; renderResults.init = true; }
+        const f = getFilters();
+        let trials = all.filter(t => t.mode === f.mode);
+        if (f.scope === 'last' && store.data.lastSess) trials = trials.filter(t => t.sess === store.data.lastSess);
+        if (!trials.length) { $('resEmpty').hidden = false; $('resEmpty').textContent = 'Nema podataka za ovaj izbor. Promijeni način ili obim podataka.'; $('resBody').hidden = true; return; }
+        $('resEmpty').hidden = true; $('resBody').hidden = false;
+
+        const win = [f.w0, Math.max(f.w0 + 100, f.w1)];
+        const types = TYPES.filter(k => trials.some(t => t.type === k));
+        const R = summarize(trials, win, types);
+        const calib = store.data.calibs[store.data.calibs.length - 1];
+
+        // tabela
+        const body = $('resRows'); body.textContent = '';
+        const row = (o, isSham) => {
+            const tr = document.createElement('tr');
+            const cell = (txt, cls) => { const td = document.createElement('td'); if (cls) td.className = cls; td.textContent = txt; tr.appendChild(td); return td; };
+            cell(LABELS[o.key]);
+            cell(o.n + (o.excluded ? ' (' + o.excluded + ' isključeno)' : ''), 'n');
+            cell(o.n ? o.hits + ' / ' + o.n + ' (' + pct(o.rate) + ')' : '–', 'n');
+            cell(o.n ? pct(o.ci[0]) + ' do ' + pct(o.ci[1]) : '–', 'n');
+            cell(isSham ? '–' : pp(o.diff), 'n');
+            cell(isSham ? '–' : pfmt(o.p), 'n');
+            const v = cell('');
+            if (!isSham) { const c = document.createElement('span'); c.className = 'chip ' + o.verdict; c.textContent = VERDICT[o.verdict]; v.appendChild(c); } else v.textContent = '–';
+            cell(o.medLat == null ? '–' : Math.round(o.medLat) + ' ms', 'n');
+            body.appendChild(tr);
+        };
+        row(R.sham, true); types.forEach(k => row(R[k], false));
+
+        drawPlot(R, types);
+
+        // zaključak
+        const good = types.filter(k => R[k].verdict === 'djeluje' || R[k].verdict === 'naznaka').sort((a, b) => R[b].diff - R[a].diff);
+        const c = $('concl'); c.textContent = '';
+        const p = document.createElement('p'); p.style.margin = '0';
+        const shamTxt = R.sham.n ? 'U kontrolnim pokušajima (bez signala) trepnuo si u ' + pct(R.sham.rate) + ' slučajeva (n=' + R.sham.n + ').' : '';
+        if (R.sham.n < 8) p.textContent = 'Premalo kontrolnih pokušaja za pouzdano poređenje (' + R.sham.n + '). Nastavi s testom.';
+        else if (good.length) {
+            const b = good[0];
+            p.textContent = shamTxt + ' Najbolji kandidat je „' + LABELS[b] + '“: ' + pct(R[b].rate) + ' treptaja, što je ' + pp(R[b].diff) + ' više od kontrole (' + VERDICT[R[b].verdict].toLowerCase() + ', p=' + pfmt(R[b].p) + ').';
+            const rt = store.data.ratings[b];
+            if (rt && rt.annoy >= 4) p.textContent += ' Ocijenio si ga kao jako smetajućeg, pa vrijedi probati nižu jačinu.';
+        } else p.textContent = shamTxt + ' Nijedan signal još jasno ne odskače od kontrole. Probaj veću jačinu ili skupi više pokušaja.';
+        c.appendChild(p);
+        if (calib && calib.perMin) {
+            const q = document.createElement('p'); q.className = 'small muted'; q.style.margin = '6px 0 0';
+            q.textContent = 'Prema kalibraciji (' + calib.perMin + ' treptaja u minuti) slučajno bi se treptaj u ovom prozoru desio u oko ' + pct(chanceRate(calib.perMin, win)) + ' pokušaja.';
+            c.appendChild(q);
+        }
+        const anyEnough = types.some(k => R[k].n >= 8);
+        $('resNote').textContent = 'p.b. znači postotnih bodova. p je vjerovatnoća da bi razlika od kontrole bila ovako velika samo slučajno (jednostrani Fisherov test). Pošto se poredi više signala odjednom, jedan „pozitivan“ rezultat može biti slučajan, pa ga potvrdi ponovnim testom. Isključeni su pokušaji u kojima je lice bilo izgubljeno ili je treptaj već bio u toku.' + (anyEnough ? '' : ' Za pouzdan zaključak treba barem oko 15 do 20 valjanih pokušaja po signalu.');
+
+        // ocjene
+        const rb = $('rateRows'); rb.textContent = '';
+        types.forEach(k => {
+            const tr = document.createElement('tr');
+            const td0 = document.createElement('td'); td0.textContent = LABELS[k]; tr.appendChild(td0);
+            ['notice', 'annoy'].forEach(field => {
+                const td = document.createElement('td'); const sel = document.createElement('select');
+                sel.setAttribute('aria-label', LABELS[k] + ' – ' + (field === 'notice' ? 'primjetnost' : 'smetnja'));
+                const e = document.createElement('option'); e.value = ''; e.textContent = '–'; sel.appendChild(e);
+                for (let i = 1; i <= 5; i++) { const o = document.createElement('option'); o.value = String(i); o.textContent = String(i); sel.appendChild(o); }
+                const cur = store.data.ratings[k] && store.data.ratings[k][field]; if (cur) sel.value = String(cur);
+                sel.addEventListener('change', () => { store.data.ratings[k] = store.data.ratings[k] || {}; store.data.ratings[k][field] = sel.value ? Number(sel.value) : null; saveStore(); renderResults(); });
+                td.appendChild(sel); tr.appendChild(td);
+            });
+            rb.appendChild(tr);
+        });
+
+        // treptanje
+        const bs = $('blinkStats'); bs.textContent = '';
+        const add = (label, val) => { const d = document.createElement('div'); const s = document.createElement('span'); s.textContent = label; const b = document.createElement('b'); b.textContent = val; d.appendChild(s); d.appendChild(b); bs.appendChild(d); };
+        const sess = store.data.sessions.filter(s => s.mode === f.mode);
+        const lastS = sess[sess.length - 1];
+        add('U kalibraciji (u minuti)', calib ? String(calib.perMin) : '–');
+        add('U testu (u minuti)', lastS ? String(lastS.perMin) : '–');
+        add('Nepotpuni, kalibracija', calib && calib.incompletePct != null ? calib.incompletePct + '%' : '–');
+        add('Nepotpuni, test', lastS && lastS.incompletePct != null ? lastS.incompletePct + '%' : '–');
+        add('Valjanih pokušaja ukupno', String(trials.filter(t => hitInfo(t, win).valid).length));
+        $('blinkNote').textContent = 'Brojka u testu uključuje i treptaje izazvane signalima. Nepotpuni treptaji su procjena iz kamere i manje su pouzdani od ukupnog broja.';
+    }
+
+    function drawPlot(R, types) {
+        const svg = $('plot'); svg.textContent = '';
+        const NS = 'http://www.w3.org/2000/svg';
+        const rows = ['sham'].concat(types), rh = 36, top = 8, left = 170, right = 24, W = 680, H = top + rows.length * rh + 34;
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+        const mk = (n, a, txt) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; svg.appendChild(e); return e; };
+        let mx = 0.4; rows.forEach(k => { if (R[k].n) mx = Math.max(mx, R[k].ci[1]); });
+        mx = Math.min(1, Math.ceil(mx * 10) / 10);
+        const X = v => left + v / mx * (W - left - right);
+        for (let g = 0; g <= mx + 1e-9; g += (mx > 0.6 ? 0.2 : 0.1)) {
+            mk('line', { x1: X(g), x2: X(g), y1: top, y2: top + rows.length * rh, stroke: 'var(--line)', 'stroke-width': 1 });
+            mk('text', { x: X(g), y: top + rows.length * rh + 18, 'text-anchor': 'middle' }, Math.round(g * 100) + '%');
+        }
+        const sh = R.sham;
+        if (sh.n) {
+            mk('rect', { x: X(sh.ci[0]), y: top, width: Math.max(1, X(sh.ci[1]) - X(sh.ci[0])), height: rows.length * rh, fill: 'var(--muted)', opacity: 0.14 });
+            mk('line', { x1: X(sh.rate), x2: X(sh.rate), y1: top, y2: top + rows.length * rh, stroke: 'var(--muted)', 'stroke-width': 1.5, 'stroke-dasharray': '4 4' });
+        }
+        rows.forEach((k, i) => {
+            const o = R[k], y = top + i * rh + rh / 2;
+            mk('text', { x: left - 12, y: y + 4, 'text-anchor': 'end' }, LABELS[k].replace(' (bez signala)', ''));
+            if (!o.n) return;
+            const strong = k !== 'sham' && o.verdict === 'djeluje';
+            const col = k === 'sham' ? 'var(--muted)' : 'var(--accent)';
+            mk('line', { x1: X(o.ci[0]), x2: X(o.ci[1]), y1: y, y2: y, stroke: col, 'stroke-width': 2.5, 'stroke-linecap': 'round' });
+            mk('circle', { cx: X(o.rate), cy: y, r: 6, fill: (strong || k === 'sham') ? col : 'var(--bg)', stroke: col, 'stroke-width': 2 });
+        });
+    }
+    ['fScope', 'fMode', 'fW0', 'fW1'].forEach(id => $(id).addEventListener('change', renderResults));
+
+    $('rNew').addEventListener('click', () => setPhase('test'));
+    function download(name, text, type) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], { type }));
+        a.download = name; document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    }
+    $('rJson').addEventListener('click', () => download('treptaj-podaci.json', JSON.stringify(store.data, null, 1), 'application/json'));
+    $('rCsv').addEventListener('click', () => {
+        const f = getFilters(), win = [f.w0, Math.max(f.w0 + 100, f.w1)];
+        const lines = ['sesija;nacin;signal;jacina;vrijeme;valjan;pogodak;kasnjenje_ms;treptaji_ms'];
+        store.data.trials.forEach(t => {
+            const h = hitInfo(t, win);
+            lines.push([t.sess, t.mode, t.type, t.intensity, new Date(t.wall).toISOString(), h.valid ? 1 : 0, h.valid ? (h.hit ? 1 : 0) : '', h.lat == null ? '' : Math.round(h.lat), t.blinks.map(b => b.on).join('|')].join(';'));
+        });
+        download('treptaj-pokusaji.csv', lines.join('\n'), 'text/csv');
+    });
+    $('rClear').addEventListener('click', () => {
+        if (!confirm('Obrisati sve rezultate, kalibracije i ocjene s ovog računara?')) return;
+        store.data = { trials: [], calibs: [], sessions: [], ratings: {}, lastSess: null };
+        saveStore(); renderResults.init = false; setPhase('setup');
+    });
+    $('toCalib').addEventListener('click', () => setPhase('calib'));
+
+    /* ---------- pokretanje ---------- */
+    loadStore();
+    if (!store.ok) $('storeWarn').hidden = false;
+    document.body.dataset.cam = 'off';
+    if (store.data.calibs.length) showCalibResult(store.data.calibs[store.data.calibs.length - 1]);
+    syncForm();
+    setPhase('setup');
+    window.__lab = { S, store, rec };   // za dijagnostiku
+
+</script>
+</body>
+</html>
